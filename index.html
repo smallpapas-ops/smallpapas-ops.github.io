@@ -174,6 +174,54 @@ tr:last-child td{border-bottom:none;}
 .stat-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);}
 .stat-row:last-child{border-bottom:none;}
 </style>
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyBfktGpdLguFvEcncQXTrf6xf5oDFf08oY",
+    authDomain: "leave-system-2026-5a36f.firebaseapp.com",
+    projectId: "leave-system-2026-5a36f",
+    storageBucket: "leave-system-2026-5a36f.firebasestorage.app",
+    messagingSenderId: "698441014212",
+    appId: "1:698441014212:web:7bf9cc77d6989c820f2291"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const STATE_DOC = 'state/main';
+
+  // Expose to global scope
+  window._fbSave = async function(stateObj) {
+    try {
+      await setDoc(doc(db, 'state', 'main'), { data: JSON.stringify(stateObj) });
+    } catch(e) { console.error('Firebase save error', e); }
+  };
+
+  window._fbLoad = async function() {
+    try {
+      const snap = await getDoc(doc(db, 'state', 'main'));
+      if(snap.exists()) return JSON.parse(snap.data().data);
+    } catch(e) { console.error('Firebase load error', e); }
+    return null;
+  };
+
+  window._fbListen = function(callback) {
+    return onSnapshot(doc(db, 'state', 'main'), (snap) => {
+      if(snap.exists()) {
+        try {
+          const data = JSON.parse(snap.data().data);
+          callback(data);
+        } catch(e) {}
+      }
+    });
+  };
+
+  window._fbReady = true;
+  // Signal app to initialize
+  document.dispatchEvent(new Event('firebaseReady'));
+</script>
 </head>
 <body>
 
@@ -539,12 +587,72 @@ function loadState(){
     const s = localStorage.getItem('leaveSystemState');
     if(s) return JSON.parse(s);
   }catch(e){}
-  // init
   const members = [...RAW_A,...RAW_B].map(m=>({...m,customLeave:null}));
   return {members, applications:[], currentUserId:null, calYear:2026, calMonth:4, adminPassword:'AF0713'};
 }
+let _saveTimer = null;
 function saveState(){
+  // Always save to localStorage as backup
   try{ localStorage.setItem('leaveSystemState',JSON.stringify(state)); }catch(e){}
+  // Debounce Firebase saves (300ms)
+  if(_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async ()=>{
+    if(window._fbSave){ _lastSaveTime = Date.now(); await window._fbSave(state); }
+  }, 300);
+}
+let _isListening = false;
+let _lastSaveTime = 0;
+function startFirebaseSync(){
+  if(_isListening) return;
+  _isListening = true;
+  // Load latest from Firebase first
+  if(window._fbLoad){
+    window._fbLoad().then(remote => {
+      if(remote){
+        // Merge: keep whichever has more applications
+        if(!state.applications || remote.applications.length >= state.applications.length){
+          state = remote;
+          state.currentUserId = null; // always reset current user on load
+          saveState();
+          renderCurrentTab();
+          showSyncBadge('☁️ 已從雲端載入');
+        }
+      }
+      // Start real-time listener
+      window._fbListen((remote) => {
+        const now = Date.now();
+        if(now - _lastSaveTime < 1000) return; // ignore echo from own saves
+        if(remote && remote.applications){
+          state = remote;
+          state.currentUserId = null;
+          try{ localStorage.setItem('leaveSystemState',JSON.stringify(state)); }catch(e){}
+          renderCurrentTab();
+        }
+      });
+    });
+  }
+}
+function showSyncBadge(msg){
+  let badge = document.getElementById('syncBadge');
+  if(!badge){
+    badge = document.createElement('div');
+    badge.id = 'syncBadge';
+    badge.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a202c;color:#fff;padding:8px 16px;border-radius:20px;font-size:13px;z-index:9999;opacity:1;transition:opacity 1s;';
+    document.body.appendChild(badge);
+  }
+  badge.textContent = msg;
+  badge.style.opacity = '1';
+  setTimeout(()=>{ badge.style.opacity='0'; }, 2500);
+}
+function renderCurrentTab(){
+  const activeTab = document.querySelector('.tab-item.active');
+  if(!activeTab) return;
+  const tab = activeTab.dataset.tab;
+  if(tab==='records') renderRecords(recordFilter);
+  else if(tab==='groups') renderGroups();
+  else if(tab==='calendar') renderCalendar();
+  // update user info if selected
+  if(currentUserId) updateSelectedUserInfo();
 }
 
 // ── TAIWAN HOLIDAYS (2025-2026 simplified) ──
@@ -1190,6 +1298,13 @@ function approveApp(id,status){
   renderAdminKpiCards();
   renderRecords(recordFilter);
   renderCalendar();
+
+  // Start Firebase cloud sync
+  if(window._fbReady){
+    startFirebaseSync();
+  } else {
+    document.addEventListener('firebaseReady', ()=> startFirebaseSync());
+  }
 }
 
 function openAdminEdit(id){
