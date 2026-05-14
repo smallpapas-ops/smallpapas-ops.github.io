@@ -189,9 +189,16 @@ tr:last-child td{border-bottom:none;}
   firebase.initializeApp(firebaseConfig);
   const _db = firebase.firestore();
 
+  // ── FIX 4: 儲存到 Firebase 時，排除 calYear/calMonth（這是本機 UI 狀態，不應同步）
   window._fbSave = async function(stateObj) {
     try {
-      await _db.collection('state').doc('main').set({ data: JSON.stringify(stateObj) });
+      const toSave = {
+        applications: stateObj.applications,
+        members: stateObj.members,
+        adminPassword: stateObj.adminPassword
+        // 故意不存 calYear / calMonth / currentUserId
+      };
+      await _db.collection('state').doc('main').set({ data: JSON.stringify(toSave) });
     } catch(e) { console.error('Firebase save error', e); }
   };
 
@@ -355,8 +362,6 @@ tr:last-child td{border-bottom:none;}
       <div id="calMonthSummary"></div>
     </div>
   </div>
-
-  <!-- ══ TAB 5: ADMIN (managed separately) ══ -->
 </div>
 
 <!-- ══════ ADMIN LOGIN ══════ -->
@@ -579,8 +584,10 @@ function loadState(){
     if(s) return JSON.parse(s);
   }catch(e){}
   const members = [...RAW_A,...RAW_B].map(m=>({...m,customLeave:null}));
-  return {members, applications:[], currentUserId:null, calYear:2026, calMonth:4, adminPassword:'AF0713'};
+  return {members, applications:[], currentUserId:null, calYear:new Date().getFullYear(), calMonth:new Date().getMonth(), adminPassword:'AF0713'};
 }
+
+// ── FIX 4: saveState 只把 business data 推到 Firebase，calYear/calMonth 只存 localStorage
 let _saveTimer = null;
 function saveState(){
   try{ localStorage.setItem('leaveSystemState',JSON.stringify(state)); }catch(e){}
@@ -588,44 +595,59 @@ function saveState(){
   _saveTimer = setTimeout(async ()=>{
     if(window._fbSave){
       _ignoreNext = true;
-      await window._fbSave(state);
+      await window._fbSave(state); // _fbSave 已過濾掉 calYear/calMonth
     }
   }, 300);
 }
+
+// ── FIX 3: 月曆切換只存本機，不觸發 Firebase 同步
+function saveCalendarLocal(){
+  try{ localStorage.setItem('leaveSystemState',JSON.stringify(state)); }catch(e){}
+}
+
 let _isListening = false;
 let _ignoreNext = false;
+
 function startFirebaseSync(){
   if(_isListening) return;
   _isListening = true;
   if(!window._fbLoad) return;
-  // Load from Firebase on startup
+
+  // ── FIX 1 & 2: 啟動時從 Firebase 載入，不先推本機資料上去
   window._fbLoad().then(remote => {
     if(remote && remote.members){
       state.applications = remote.applications || [];
       state.members = remote.members || state.members;
       state.adminPassword = remote.adminPassword || state.adminPassword;
-      state.calYear = remote.calYear || state.calYear;
-      state.calMonth = remote.calMonth !== undefined ? remote.calMonth : state.calMonth;
+      // ── FIX 3: 不從 remote 恢復 calYear/calMonth，保持本機月曆視角
       state.currentUserId = null;
       try{ localStorage.setItem('leaveSystemState',JSON.stringify(state)); }catch(e){}
       renderCurrentTab();
       showSyncBadge('☁️ 已從雲端載入');
     }
-    // Real-time listener for changes from other devices
+
+    // 即時監聽其他裝置的變更
     window._fbListen((remote) => {
       if(_ignoreNext){ _ignoreNext=false; return; }
       if(!remote || !remote.members) return;
       const myUser = currentUserId;
+      const myCalYear = calYear;   // ── FIX 3: 保留本機月曆視角
+      const myCalMonth = calMonth;
       state.applications = remote.applications || [];
       state.members = remote.members || state.members;
       state.adminPassword = remote.adminPassword || state.adminPassword;
-      state.currentUserId = myUser; // keep current user
+      state.currentUserId = myUser;
+      state.calYear = myCalYear;   // 不被遠端覆蓋
+      state.calMonth = myCalMonth;
+      calYear = myCalYear;
+      calMonth = myCalMonth;
       try{ localStorage.setItem('leaveSystemState',JSON.stringify(state)); }catch(e){}
       renderCurrentTab();
       showSyncBadge('🔄 已同步更新');
     });
   });
 }
+
 function showSyncBadge(msg){
   let badge = document.getElementById('syncBadge');
   if(!badge){
@@ -638,14 +660,14 @@ function showSyncBadge(msg){
   badge.style.opacity = '1';
   setTimeout(()=>{ badge.style.opacity='0'; }, 2500);
 }
+
 function renderCurrentTab(){
-  const activeTab = document.querySelector('.tab-item.active');
+  const activeTab = document.querySelector('#tabBar .tab-item.active');
   if(!activeTab) return;
   const tab = activeTab.dataset.tab;
   if(tab==='records') renderRecords(recordFilter);
   else if(tab==='groups') renderGroups();
   else if(tab==='calendar') renderCalendar();
-  // update user info if selected
   if(currentUserId) updateSelectedUserInfo();
 }
 
@@ -661,8 +683,7 @@ const TW_HOLIDAYS = new Set([
 function isHoliday(d){
   const dow = d.getDay();
   if(dow===0||dow===6) return true;
-  const key = fmtDate(d);
-  return TW_HOLIDAYS.has(key);
+  return TW_HOLIDAYS.has(fmtDate(d));
 }
 function countWorkdays(start,end){
   let count=0, d=new Date(start);
@@ -675,7 +696,7 @@ function fmtDate(d){ return d.toISOString().slice(0,10); }
 function parseDate(s){ const d=new Date(s); d.setHours(0,0,0,0); return d; }
 function todayStr(){ return fmtDate(new Date()); }
 
-// ── LEAVE CALCULATION (2016 new rules) ──
+// ── LEAVE CALCULATION ──
 function calcLeave(joinDateStr){
   const join = parseDate(joinDateStr.replace(/\//g,'-'));
   const today = new Date(); today.setHours(0,0,0,0);
@@ -707,13 +728,12 @@ function remainLeave(memberId){
 }
 
 // ── CURRENT USER ──
-let currentUserId = state.currentUserId || null;
+let currentUserId = null; // 每次開啟不自動還原
 
 function getCurrentUser(){ return currentUserId ? getMember(currentUserId) : null; }
 
 function searchUser(val){
-  const s=val.trim().toLowerCase();
-  if(!s){document.getElementById('userSuggestions').innerHTML='';return;}
+  if(!val.trim()){document.getElementById('userSuggestions').innerHTML='';return;}
   const found = state.members.filter(m=>m.name.includes(val)||m.id.includes(val));
   document.getElementById('userSuggestions').innerHTML = found.slice(0,6).map(m=>`
     <div style="padding:8px 10px;cursor:pointer;border-radius:8px;background:var(--surface2);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;"
@@ -725,8 +745,6 @@ function searchUser(val){
 
 function selectUser(id){
   currentUserId = id;
-  state.currentUserId = id;
-  saveState();
   const m = getMember(id);
   document.getElementById('userInput').value = m.name;
   document.getElementById('userSuggestions').innerHTML='';
@@ -781,7 +799,6 @@ function setApplyType(t,el){
   document.getElementById('swapForm').style.display=t==='swap'?'block':'none';
 }
 
-// ── DATE LIMITS ──
 function getMaxFutureDate(){
   const d=new Date(); d.setMonth(d.getMonth()+8);
   return fmtDate(d);
@@ -814,46 +831,29 @@ function checkNormalConflict(startStr,endStr,wd){
       }
     }
   }
-
   let html='';
   if(conflicts.length>0 && wd>=5){
     html+=`<div class="conflict-box">⛔ <b>工作日衝突</b><br>`;
-    for(const c of conflicts){
-      html+=`與 ${c.name} 重疊 ${c.wd} 個工作日（${c.days[0]} ~ ${c.days[c.days.length-1]}）<br>`;
-    }
+    for(const c of conflicts) html+=`與 ${c.name} 重疊 ${c.wd} 個工作日（${c.days[0]} ~ ${c.days[c.days.length-1]}）<br>`;
     html+=`</div>`;
-    // suggest split
     const busyDays=new Set(conflicts.flatMap(c=>c.days));
     const segments=getSuggestSegments(start,end,busyDays);
     if(segments.length>0){
       html+=`<div class="suggest-box">📋 建議分段申請：<br>`;
-      for(const seg of segments){
-        html+=`${seg.start} – ${seg.end}（${seg.wd} 工作天）<br>`;
-      }
+      for(const seg of segments) html+=`${seg.start} – ${seg.end}（${seg.wd} 工作天）<br>`;
       html+=`💡 也可改用對調申請方式</div>`;
     }
   }
-
-  // quota check
   const total=getMemberLeave(m.id);
   const halfQuota=Math.floor(total/2);
-  if(wd>=5 && wd>halfQuota){
-    html+=`<div class="alert alert-err">你已超過個人特休天數1/2（${halfQuota}天）</div>`;
-  }
-  // same group long leave
+  if(wd>=5 && wd>halfQuota) html+=`<div class="alert alert-err">你已超過個人特休天數1/2（${halfQuota}天）</div>`;
   if(wd>=5){
     const longConflict=checkLongLeaveConflict(m.group,start,end,m.id);
-    if(longConflict){
-      html+=`<div class="alert alert-err">該假期本組已有長假預約名額（${longConflict}）</div>`;
-    }
+    if(longConflict) html+=`<div class="alert alert-err">該假期本組已有長假預約名額（${longConflict}）</div>`;
   }
-
   document.getElementById('normalConflict').innerHTML=html;
-
-  // leave info
-  const total2=getMemberLeave(m.id);
   const used=usedLeave(m.id,new Date().getFullYear());
-  document.getElementById('normalLeaveInfo').innerHTML=`<div class="text-sm">剩餘特休：${total2-used}天 | 本次申請：${wd}天</div>`;
+  document.getElementById('normalLeaveInfo').innerHTML=`<div class="text-sm">剩餘特休：${total-used}天 | 本次申請：${wd}天</div>`;
 }
 
 function checkLongLeaveConflict(group,start,end,excludeId){
@@ -868,12 +868,10 @@ function checkLongLeaveConflict(group,start,end,excludeId){
   return null;
 }
 function isHolidayRange(start,end){
-  // if all overlap days are holidays, OK
   let d=new Date(start);
   while(d<=end){ if(!isHoliday(d)) return false; d.setDate(d.getDate()+1); }
   return true;
 }
-
 function getSuggestSegments(start,end,busyDays){
   const segs=[];
   let segStart=null, segEnd=null;
@@ -884,10 +882,7 @@ function getSuggestSegments(start,end,busyDays){
       if(!segStart) segStart=new Date(d);
       segEnd=new Date(d);
     } else {
-      if(segStart){
-        segs.push({start:fmtDate(segStart),end:fmtDate(segEnd),wd:countWorkdays(segStart,segEnd)});
-        segStart=null;
-      }
+      if(segStart){ segs.push({start:fmtDate(segStart),end:fmtDate(segEnd),wd:countWorkdays(segStart,segEnd)}); segStart=null; }
     }
     d.setDate(d.getDate()+1);
   }
@@ -919,14 +914,9 @@ function submitNormal(){
   }
   const app={
     id:'APP'+Date.now(),
-    applicantId:m.id,
-    applicantName:m.name,
-    group:m.group,
-    type:'normal',
-    startDate:s,endDate:e,workdays:wd,
-    status:'pending',
-    appliedAt:new Date().toISOString(),
-    note:'',history:[]
+    applicantId:m.id, applicantName:m.name, group:m.group,
+    type:'normal', startDate:s, endDate:e, workdays:wd,
+    status:'pending', appliedAt:new Date().toISOString(), note:'', history:[]
   };
   state.applications.push(app);
   saveState();
@@ -937,7 +927,7 @@ function submitNormal(){
   document.getElementById('normalConflict').innerHTML='';
 }
 
-// ── SWAP PARTNER SEARCH ──
+// ── SWAP ──
 let swapPartnerId=null;
 function lookupSwapPartner(val){
   const m=getCurrentUser(); if(!m) return;
@@ -952,13 +942,9 @@ function lookupSwapPartner(val){
   } else {
     swapPartnerId=null;
     const wrongGroup=state.members.find(x=>x.id===v);
-    if(wrongGroup){
-      infoEl.innerHTML=`<div class="alert alert-err">⚠️ ${wrongGroup.name} 為 ${wrongGroup.group} 組，對調人員需為 ${otherGroup} 組</div>`;
-    } else if(v.length>=4){
-      infoEl.innerHTML=`<div class="alert alert-err">未找到員工編號 ${v}</div>`;
-    } else {
-      infoEl.innerHTML='';
-    }
+    if(wrongGroup) infoEl.innerHTML=`<div class="alert alert-err">⚠️ ${wrongGroup.name} 為 ${wrongGroup.group} 組，對調人員需為 ${otherGroup} 組</div>`;
+    else if(v.length>=4) infoEl.innerHTML=`<div class="alert alert-err">未找到員工編號 ${v}</div>`;
+    else infoEl.innerHTML='';
   }
 }
 
@@ -993,14 +979,11 @@ function submitSwap(){
   const partner=getMember(swapPartnerId);
   const app={
     id:'APP'+Date.now(),
-    applicantId:m.id,applicantName:m.name,group:m.group,
-    partnerId:swapPartnerId,partnerName:partner.name,
-    type:'swap',
-    startDate:ms,endDate:me,workdays:wd,
-    status:'swap_pending',
-    appliedAt:new Date().toISOString(),
-    note:'',history:[],
-    partnerConfirmed:false
+    applicantId:m.id, applicantName:m.name, group:m.group,
+    partnerId:swapPartnerId, partnerName:partner.name,
+    type:'swap', startDate:ms, endDate:me, workdays:wd,
+    status:'swap_pending', appliedAt:new Date().toISOString(),
+    note:'', history:[], partnerConfirmed:false
   };
   state.applications.push(app);
   saveState();
@@ -1012,7 +995,6 @@ function submitSwap(){
   document.getElementById('swapMyEnd').value='';
   document.getElementById('swapDayCount').innerHTML='';
 }
-
 
 // ── RECORDS ──
 let recordFilter='all';
@@ -1028,23 +1010,20 @@ function renderRecords(filter){
   const el=document.getElementById('recordsList');
   if(!apps.length){el.innerHTML='<div class="text-muted" style="padding:20px;text-align:center;">無記錄</div>';return;}
   el.innerHTML=apps.map(a=>renderRecordItem(a,false)).join('');
-  // check expired swaps
   checkExpiredSwaps();
 }
 
 function renderRecordItem(a,isAdmin){
   const partner=a.partnerId?getMember(a.partnerId):null;
   const statusMap={pending:'badge-yellow',done:'badge-green',rejected:'badge-red',swap_pending:'badge-orange',swap_expired:'badge-red'};
-  const isManager=isAdmin;
   let actionBtns='';
-  if(isManager){
+  if(isAdmin){
     if(a.status==='pending'||a.status==='swap_pending'){
       actionBtns+=`<button class="btn btn-success btn-sm" onclick="approveApp('${a.id}','done')">✓ 核准</button>
         <button class="btn btn-danger btn-sm" onclick="approveApp('${a.id}','rejected')">✗ 退件</button>`;
     }
     actionBtns+=`<button class="btn btn-ghost btn-sm" onclick="openAdminEdit('${a.id}')">✏️ 修改</button>`;
   } else {
-    // partner confirm for swap
     if(a.status==='swap_pending' && a.partnerId===currentUserId){
       actionBtns+=`<button class="btn btn-success btn-sm" onclick="confirmSwap('${a.id}',true)">✓ 確認對調</button>
         <button class="btn btn-danger btn-sm" onclick="confirmSwap('${a.id}',false)">✗ 拒絕</button>`;
@@ -1055,7 +1034,7 @@ function renderRecordItem(a,isAdmin){
       <div>
         <div class="record-name">${a.applicantName} <span class="badge badge-${(a.group||'A').toLowerCase()}">${a.group||'A'}組</span></div>
         <div class="record-dates">${a.startDate} ~ ${a.endDate}（${a.workdays}工作天）
-          ${a.type==='swap'?`<br>對調：${partner?partner.name:a.partnerName} ${a.theirStart}~${a.theirEnd}`:''}
+          ${a.type==='swap'?`<br>對調：${partner?partner.name:a.partnerName}`:''}
         </div>
       </div>
       <span class="badge ${statusMap[a.status]||'badge-gray'}">${statusLabel(a.status)}</span>
@@ -1091,20 +1070,18 @@ function confirmSwap(id,confirm){
 
 function checkExpiredSwaps(){
   const now=new Date();
+  let changed=false;
   state.applications.filter(a=>a.status==='swap_pending').forEach(a=>{
-    const applied=new Date(a.appliedAt);
-    const diff=(now-applied)/(1000*60*60*24);
-    if(diff>14) a.status='swap_expired';
+    const diff=(now-new Date(a.appliedAt))/(1000*60*60*24);
+    if(diff>14){ a.status='swap_expired'; changed=true; }
   });
-  saveState();
+  if(changed) saveState();
 }
 
 // ── GROUPS ──
 function renderGroups(){
-  const groupA=state.members.filter(m=>m.group==='A');
-  const groupB=state.members.filter(m=>m.group==='B');
-  document.getElementById('groupA').innerHTML=groupA.map(m=>renderMemberCard(m)).join('');
-  document.getElementById('groupB').innerHTML=groupB.map(m=>renderMemberCard(m)).join('');
+  document.getElementById('groupA').innerHTML=state.members.filter(m=>m.group==='A').map(m=>renderMemberCard(m)).join('');
+  document.getElementById('groupB').innerHTML=state.members.filter(m=>m.group==='B').map(m=>renderMemberCard(m)).join('');
 }
 function renderMemberCard(m,isAdmin){
   const total=getMemberLeave(m.id);
@@ -1127,9 +1104,24 @@ function renderMemberCard(m,isAdmin){
 }
 
 // ── CALENDAR ──
-let calYear=state.calYear||2026, calMonth=state.calMonth||4;
-function calPrev(){calMonth--;if(calMonth<0){calMonth=11;calYear--;}state.calYear=calYear;state.calMonth=calMonth;saveState();renderCalendar();}
-function calNext(){calMonth++;if(calMonth>11){calMonth=0;calYear++;}state.calYear=calYear;state.calMonth=calMonth;saveState();renderCalendar();}
+// ── FIX 3: calYear/calMonth 是本機 UI 狀態，不寫入 Firebase
+let calYear = (()=>{ try{ const s=localStorage.getItem('leaveSystemState'); if(s){ const p=JSON.parse(s); return p.calYear||new Date().getFullYear(); } }catch(e){} return new Date().getFullYear(); })();
+let calMonth = (()=>{ try{ const s=localStorage.getItem('leaveSystemState'); if(s){ const p=JSON.parse(s); return p.calMonth!=null?p.calMonth:new Date().getMonth(); } }catch(e){} return new Date().getMonth(); })();
+
+function calPrev(){
+  calMonth--;
+  if(calMonth<0){calMonth=11;calYear--;}
+  state.calYear=calYear; state.calMonth=calMonth;
+  saveCalendarLocal(); // ── FIX 2: 只存本機，不推 Firebase
+  renderCalendar();
+}
+function calNext(){
+  calMonth++;
+  if(calMonth>11){calMonth=0;calYear++;}
+  state.calYear=calYear; state.calMonth=calMonth;
+  saveCalendarLocal(); // ── FIX 2: 只存本機，不推 Firebase
+  renderCalendar();
+}
 
 function renderCalendar(){
   const monthNames=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
@@ -1144,7 +1136,6 @@ function renderCalendar(){
   const today=new Date(); today.setHours(0,0,0,0);
   for(let day=1;day<=last.getDate();day++){
     const d=new Date(calYear,calMonth,day);
-    const key=fmtDate(d);
     const isToday=fmtDate(d)===fmtDate(today);
     const isWknd=d.getDay()===0||d.getDay()===6;
     const appsThisDay=state.applications.filter(a=>{
@@ -1187,9 +1178,7 @@ function openAdmin(){
   document.getElementById('app').style.display='none';
   document.getElementById('adminLoginWrap').style.display='flex';
 }
-function getAdminPassword(){
-  return state.adminPassword || 'AF0713';
-}
+function getAdminPassword(){ return state.adminPassword || 'AF0713'; }
 function checkAdminPw(){
   const pw=document.getElementById('adminPwInput').value;
   if(pw===getAdminPassword()){
@@ -1207,15 +1196,9 @@ function changeAdminPassword(){
   const nw=document.getElementById('pwNew').value;
   const cf=document.getElementById('pwConfirm').value;
   const msgEl=document.getElementById('pwMsg');
-  if(cur!==getAdminPassword()){
-    msgEl.innerHTML='<div class="alert alert-err">目前密碼錯誤</div>';return;
-  }
-  if(nw.length<4){
-    msgEl.innerHTML='<div class="alert alert-err">新密碼至少需要4位</div>';return;
-  }
-  if(nw!==cf){
-    msgEl.innerHTML='<div class="alert alert-err">兩次輸入的新密碼不一致</div>';return;
-  }
+  if(cur!==getAdminPassword()){msgEl.innerHTML='<div class="alert alert-err">目前密碼錯誤</div>';return;}
+  if(nw.length<4){msgEl.innerHTML='<div class="alert alert-err">新密碼至少需要4位</div>';return;}
+  if(nw!==cf){msgEl.innerHTML='<div class="alert alert-err">兩次輸入的新密碼不一致</div>';return;}
   state.adminPassword=nw;
   saveState();
   msgEl.innerHTML='<div class="alert alert-ok">✓ 密碼已成功變更</div>';
@@ -1226,8 +1209,7 @@ function changeAdminPassword(){
 function closeAdminLogin(){
   document.getElementById('adminLoginWrap').style.display='none';
   document.getElementById('app').style.display='block';
-  // reset tab
-  document.querySelectorAll('.tab-item').forEach(t=>{t.classList.remove('active');if(t.dataset.tab==='apply')t.classList.add('active');});
+  document.querySelectorAll('#tabBar .tab-item').forEach(t=>{t.classList.remove('active');if(t.dataset.tab==='apply')t.classList.add('active');});
 }
 function renderAdminPanel(){
   document.getElementById('app').style.display='none';
@@ -1248,18 +1230,15 @@ function switchAdminTab(tab,el){
   document.querySelectorAll('#adminPanel .panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('atab-'+tab).classList.add('active');
 }
-
 function renderAdminKpiCards(){
   const total=state.applications.length;
   const done=state.applications.filter(a=>a.status==='done').length;
   const pending=state.applications.filter(a=>a.status==='pending'||a.status==='swap_pending').length;
-  const swapOk=state.applications.filter(a=>a.type==='swap'&&a.status==='done').length;
   document.getElementById('adminKpiCards').innerHTML=`
     <div class="kpi-card"><div class="kpi-val">${total}</div><div class="kpi-label">總申請數</div></div>
     <div class="kpi-card"><div class="kpi-val" style="color:var(--orange)">${pending}</div><div class="kpi-label">待審核</div></div>
     <div class="kpi-card"><div class="kpi-val" style="color:var(--green)">${done}</div><div class="kpi-label">已完成</div></div>`;
 }
-
 function renderAdminRecords(filter){
   let apps=[...state.applications].sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt));
   if(filter!=='all') apps=apps.filter(a=>a.status===filter);
@@ -1274,14 +1253,12 @@ function filterAdminRecords(f,el){
   el.classList.add('active');
   renderAdminRecords(f);
 }
-
 function renderAdminPending(){
   const apps=state.applications.filter(a=>a.status==='pending'||a.status==='swap_pending');
   document.getElementById('adminPendingList').innerHTML=apps.length
     ? apps.map(a=>renderRecordItem(a,true)).join('')
     : '<div class="text-muted" style="padding:20px;text-align:center;">暫無待審核申請 ✓</div>';
 }
-
 function approveApp(id,status){
   const app=state.applications.find(a=>a.id===id); if(!app) return;
   app.status=status;
@@ -1292,14 +1269,9 @@ function approveApp(id,status){
   renderAdminKpiCards();
   renderRecords(recordFilter);
   renderCalendar();
-
-  // Start Firebase cloud sync
-  startFirebaseSync();
 }
-
 function openAdminEdit(id){
   const app=state.applications.find(a=>a.id===id); if(!app) return;
-  const partner=app.partnerId?getMember(app.partnerId):null;
   document.getElementById('adminEditContent').innerHTML=`
     <div class="form-row"><label>申請人</label>
       <select id="editApplicant">${state.members.map(m=>`<option value="${m.id}" ${m.id===app.applicantId?'selected':''}>${m.name}（${m.group}組）</option>`).join('')}</select>
@@ -1326,14 +1298,11 @@ function openAdminEdit(id){
     <button class="btn btn-primary btn-full mt-12" onclick="saveAdminEdit('${id}')">儲存</button>`;
   document.getElementById('adminEditOverlay').classList.add('active');
 }
-
 function saveAdminEdit(id){
   const app=state.applications.find(a=>a.id===id); if(!app) return;
   const newApplicantId=document.getElementById('editApplicant').value;
   const newMember=getMember(newApplicantId);
-  app.applicantId=newApplicantId;
-  app.applicantName=newMember.name;
-  app.group=newMember.group;
+  app.applicantId=newApplicantId; app.applicantName=newMember.name; app.group=newMember.group;
   app.startDate=document.getElementById('editStart').value;
   app.endDate=document.getElementById('editEnd').value;
   app.workdays=countWorkdays(parseDate(app.startDate),parseDate(app.endDate));
@@ -1353,12 +1322,9 @@ function saveAdminEdit(id){
   renderCalendar();
   alert('已儲存修改');
 }
-
 function renderAdminMembers(){
-  const list=document.getElementById('adminMemberList');
-  list.innerHTML=`<div class="grid-2">${state.members.map(m=>renderMemberCard(m,true)).join('')}</div>`;
+  document.getElementById('adminMemberList').innerHTML=`<div class="grid-2">${state.members.map(m=>renderMemberCard(m,true)).join('')}</div>`;
 }
-
 function openEditMember(id){
   const m=getMember(id); if(!m) return;
   document.getElementById('editMemberContent').innerHTML=`
@@ -1380,19 +1346,15 @@ function saveEditMember(id){
   m.customLeave=lv!==''?parseInt(lv):null;
   saveState();
   closeOverlay('editMemberOverlay');
-  renderAdminMembers();
-  renderGroups();
+  renderAdminMembers(); renderGroups();
   alert('已儲存');
 }
 function switchMemberGroup(id){
   const m=getMember(id); if(!m) return;
   if(!confirm(`確定將 ${m.name} 從 ${m.group}組 切換到 ${m.group==='A'?'B':'A'}組？`)) return;
   m.group=m.group==='A'?'B':'A';
-  saveState();
-  renderAdminMembers();
-  renderGroups();
+  saveState(); renderAdminMembers(); renderGroups();
 }
-
 function addMember(){
   const id=document.getElementById('newEmpId').value.trim();
   const name=document.getElementById('newName').value.trim();
@@ -1402,17 +1364,12 @@ function addMember(){
   if(!id||!name||!join){alert('請填寫必要欄位');return;}
   if(state.members.find(m=>m.id===id)){alert('員工編號已存在');return;}
   state.members.push({id,name,join:join.replace(/-/g,'/'),group,customLeave:lv!==''?parseInt(lv):null});
-  saveState();
-  closeOverlay('addMemberOverlay');
-  renderAdminMembers();
-  renderGroups();
+  saveState(); closeOverlay('addMemberOverlay'); renderAdminMembers(); renderGroups();
   alert('已新增組員：'+name);
 }
 function openAddMemberModal(){
-  document.getElementById('newEmpId').value='';
-  document.getElementById('newName').value='';
-  document.getElementById('newJoinDate').value='';
-  document.getElementById('newLeave').value='';
+  document.getElementById('newEmpId').value=''; document.getElementById('newName').value='';
+  document.getElementById('newJoinDate').value=''; document.getElementById('newLeave').value='';
   document.getElementById('addMemberOverlay').classList.add('active');
 }
 
@@ -1421,7 +1378,6 @@ function renderKPI(){
   const apps=state.applications;
   const total=apps.length;
   const done=apps.filter(a=>a.status==='done').length;
-  const rejected=apps.filter(a=>a.status==='rejected').length;
   const swapTotal=apps.filter(a=>a.type==='swap').length;
   const swapDone=apps.filter(a=>a.type==='swap'&&a.status==='done').length;
   const longLeave=apps.filter(a=>a.workdays>=5&&a.status==='done').length;
@@ -1433,15 +1389,8 @@ function renderKPI(){
   const longRate=done>0?Math.round(longLeave/done*100):0;
   const expiredRate=(swapTotal+expired)>0?Math.round(expired/(swapTotal+expired)*100):0;
   const unfinishRate=total>0?Math.round(pending/total*100):0;
-
-  // by month
   const monthlyCount={};
-  apps.forEach(a=>{
-    const m=a.appliedAt?a.appliedAt.slice(0,7):'unknown';
-    monthlyCount[m]=(monthlyCount[m]||0)+1;
-  });
-
-  // per person
+  apps.forEach(a=>{ const m=a.appliedAt?a.appliedAt.slice(0,7):'unknown'; monthlyCount[m]=(monthlyCount[m]||0)+1; });
   const personStats=state.members.map(m=>{
     const myApps=apps.filter(a=>a.applicantId===m.id);
     const myDone=myApps.filter(a=>a.status==='done').reduce((s,a)=>s+a.workdays,0);
@@ -1449,7 +1398,6 @@ function renderKPI(){
     const rate=total2>0?Math.round(myDone/total2*100):0;
     return {name:m.name,group:m.group,count:myApps.length,used:myDone,total:total2,rate};
   }).sort((a,b)=>b.rate-a.rate);
-
   document.getElementById('kpiPanel').innerHTML=`
     <div class="grid-3" style="margin-bottom:16px;">
       <div class="kpi-card"><div class="kpi-val">${applyRate}%</div><div class="kpi-label">特休申請率</div></div>
@@ -1461,8 +1409,7 @@ function renderKPI(){
     </div>
     <div class="card">
       <div class="card-title">每月申請數</div>
-      ${Object.entries(monthlyCount).sort().map(([m,c])=>`
-        <div class="stat-row"><span>${m}</span><span class="badge badge-a">${c}件</span></div>`).join('')||'<div class="text-muted">無資料</div>'}
+      ${Object.entries(monthlyCount).sort().map(([m,c])=>`<div class="stat-row"><span>${m}</span><span class="badge badge-a">${c}件</span></div>`).join('')||'<div class="text-muted">無資料</div>'}
     </div>
     <div class="card" style="margin-top:12px;">
       <div class="card-title">個人特休使用率</div>
@@ -1484,14 +1431,7 @@ function exportExcel(){
   if(!window.XLSX){alert('XLSX庫未載入');return;}
   const data=state.applications.map(a=>{
     const partner=a.partnerId?getMember(a.partnerId):null;
-    return {
-      '申請人':a.applicantName,'組別':a.group,'員工編號':a.applicantId,
-      '開始日期':a.startDate,'結束日期':a.endDate,'工作天數':a.workdays,
-      '類型':a.type==='swap'?'對調':'一般',
-      '對調人員':partner?partner.name:'',
-      '狀態':statusLabel(a.status),
-      '申請時間':a.appliedAt?a.appliedAt.slice(0,19).replace('T',' '):''
-    };
+    return {'申請人':a.applicantName,'組別':a.group,'員工編號':a.applicantId,'開始日期':a.startDate,'結束日期':a.endDate,'工作天數':a.workdays,'類型':a.type==='swap'?'對調':'一般','對調人員':partner?partner.name:'','狀態':statusLabel(a.status),'申請時間':a.appliedAt?a.appliedAt.slice(0,19).replace('T',' '):''};
   });
   const ws=XLSX.utils.json_to_sheet(data);
   const wb=XLSX.utils.book_new();
@@ -1502,72 +1442,50 @@ function exportCalendar(){
   if(!window.XLSX){alert('XLSX庫未載入');return;}
   const months={};
   state.applications.forEach(a=>{
-    const m=a.startDate.slice(0,7);
-    if(!months[m]) months[m]=[];
+    const m=a.startDate.slice(0,7); if(!months[m]) months[m]=[];
     const partner=a.partnerId?getMember(a.partnerId):null;
-    months[m].push({
-      '月份':m,'申請人':a.applicantName,'組別':a.group,
-      '開始日期':a.startDate,'結束日期':a.endDate,'工作天數':a.workdays,
-      '類型':a.type==='swap'?'對調':'一般','對調人員':partner?partner.name:'',
-      '狀態':statusLabel(a.status),
-      '申請時間':a.appliedAt?a.appliedAt.slice(0,19).replace('T',' '):''
-    });
+    months[m].push({'月份':m,'申請人':a.applicantName,'組別':a.group,'開始日期':a.startDate,'結束日期':a.endDate,'工作天數':a.workdays,'類型':a.type==='swap'?'對調':'一般','對調人員':partner?partner.name:'','狀態':statusLabel(a.status),'申請時間':a.appliedAt?a.appliedAt.slice(0,19).replace('T',' '):''});
   });
   const wb=XLSX.utils.book_new();
-  Object.entries(months).sort().forEach(([m,rows])=>{
-    const ws=XLSX.utils.json_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb,ws,m);
-  });
-  if(Object.keys(months).length===0){
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([]),'空');
-  }
+  Object.entries(months).sort().forEach(([m,rows])=>{ const ws=XLSX.utils.json_to_sheet(rows); XLSX.utils.book_append_sheet(wb,ws,m); });
+  if(Object.keys(months).length===0) XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([]),'空');
   XLSX.writeFile(wb,'每月特休總覽.xlsx');
 }
 function showQR(){
   const url=window.location.href;
-  document.getElementById('qrContent').innerHTML=`
-    <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}" style="width:200px;height:200px;border-radius:8px;" alt="QR">
-    <div class="text-sm mt-8">掃描QR Code開啟系統</div>`;
+  document.getElementById('qrContent').innerHTML=`<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(url)}" style="width:200px;height:200px;border-radius:8px;" alt="QR"><div class="text-sm mt-8">掃描QR Code開啟系統</div>`;
   document.getElementById('qrOverlay').classList.add('active');
 }
 
 // ── OVERLAY ──
 function closeOverlay(id){ document.getElementById(id).classList.remove('active'); }
-document.querySelectorAll('.overlay').forEach(o=>{
-  o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('active'); });
-});
+document.querySelectorAll('.overlay').forEach(o=>{ o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('active'); }); });
 
 // ── TABS ──
 function switchTab(tab,el){
   if(tab==='admin'){openAdmin();return;}
-  document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('#tabBar .tab-item').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('#app .panel').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+tab).classList.add('active');
   if(tab==='records') renderRecords(recordFilter);
   if(tab==='groups') renderGroups();
   if(tab==='calendar') renderCalendar();
 }
 
-
-// Pre-loaded data already in Firebase
-
 // ── INIT ──
+// ── FIX 1: 啟動時先渲染畫面，再從 Firebase 載入最新資料（不先 saveState 覆蓋雲端）
 function init(){
-  // if user was previously selected
-  // 目前用戶不自動還原，每次開啟需重新選擇
-  state.currentUserId = null;
   currentUserId = null;
-  saveState();
-  // set date limits
   const today=todayStr();
   const maxDate=getMaxFutureDate();
   ['normalStart','normalEnd','swapMyStart','swapMyEnd'].forEach(id=>{
     const el=document.getElementById(id);
     if(el){el.min=today;el.max=maxDate;}
   });
-
   renderCalendar();
+  // ── FIX 1: 啟動後立即連接 Firebase，從雲端拉取最新資料並開始監聽
+  startFirebaseSync();
 }
 
 init();
