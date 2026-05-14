@@ -174,11 +174,10 @@ tr:last-child td{border-bottom:none;}
 .stat-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);}
 .stat-row:last-child{border-bottom:none;}
 </style>
-<!-- Firebase -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
+<!-- Firebase Compat SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
   const firebaseConfig = {
     apiKey: "AIzaSyBfktGpdLguFvEcncQXTrf6xf5oDFf08oY",
     authDomain: "leave-system-2026-5a36f.firebaseapp.com",
@@ -187,40 +186,32 @@ tr:last-child td{border-bottom:none;}
     messagingSenderId: "698441014212",
     appId: "1:698441014212:web:7bf9cc77d6989c820f2291"
   };
+  firebase.initializeApp(firebaseConfig);
+  const _db = firebase.firestore();
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  const STATE_DOC = 'state/main';
-
-  // Expose to global scope
   window._fbSave = async function(stateObj) {
     try {
-      await setDoc(doc(db, 'state', 'main'), { data: JSON.stringify(stateObj) });
+      await _db.collection('state').doc('main').set({ data: JSON.stringify(stateObj) });
     } catch(e) { console.error('Firebase save error', e); }
   };
 
   window._fbLoad = async function() {
     try {
-      const snap = await getDoc(doc(db, 'state', 'main'));
-      if(snap.exists()) return JSON.parse(snap.data().data);
+      const snap = await _db.collection('state').doc('main').get();
+      if(snap.exists) return JSON.parse(snap.data().data);
     } catch(e) { console.error('Firebase load error', e); }
     return null;
   };
 
   window._fbListen = function(callback) {
-    return onSnapshot(doc(db, 'state', 'main'), (snap) => {
-      if(snap.exists()) {
-        try {
-          const data = JSON.parse(snap.data().data);
-          callback(data);
-        } catch(e) {}
+    return _db.collection('state').doc('main').onSnapshot((snap) => {
+      if(snap.exists) {
+        try { callback(JSON.parse(snap.data().data)); } catch(e) {}
       }
     });
   };
 
   window._fbReady = true;
-  // Signal app to initialize
-  document.dispatchEvent(new Event('firebaseReady'));
 </script>
 </head>
 <body>
@@ -1300,11 +1291,7 @@ function approveApp(id,status){
   renderCalendar();
 
   // Start Firebase cloud sync
-  if(window._fbReady){
-    startFirebaseSync();
-  } else {
-    document.addEventListener('firebaseReady', ()=> startFirebaseSync());
-  }
+  startFirebaseSync();
 }
 
 function openAdminEdit(id){
