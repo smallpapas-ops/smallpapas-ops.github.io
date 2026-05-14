@@ -284,7 +284,7 @@ tr:last-child td{border-bottom:none;}
         <div id="normalDayCount" class="text-sm mt-8"></div>
         <div id="normalConflict" class="mt-8"></div>
         <div id="normalLeaveInfo" class="mt-8"></div>
-        <button class="btn btn-primary btn-full mt-12" onclick="submitNormal()">📤 送出申請</button>
+        <button id="submitNormalBtn" class="btn btn-primary btn-full mt-12" onclick="submitNormal()">📤 送出申請</button>
       </div>
 
       <!-- Swap form -->
@@ -807,7 +807,13 @@ function getMaxFutureDate(){
 function calcNormalDays(){
   const s=document.getElementById('normalStart').value;
   const e=document.getElementById('normalEnd').value;
-  if(!s||!e){document.getElementById('normalDayCount').innerHTML='';return;}
+  const btn=document.getElementById('submitNormalBtn');
+  if(!s||!e){
+    document.getElementById('normalDayCount').innerHTML='';
+    // 重置按鈕（日期清空時）
+    if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.style.cursor='pointer'; btn.textContent='📤 送出申請'; }
+    return;
+  }
   if(parseDate(e)<parseDate(s)){document.getElementById('normalDayCount').innerHTML='<span style="color:var(--red)">結束日期不可早於開始日期</span>';return;}
   const wd=countWorkdays(parseDate(s),parseDate(e));
   document.getElementById('normalDayCount').innerHTML=`計算工作天數：<b>${wd}</b>天`;
@@ -831,29 +837,54 @@ function checkNormalConflict(startStr,endStr,wd){
       }
     }
   }
+
   let html='';
+  let blocked=false; // 是否阻擋送出
+
+  // 長假工作日衝突 → 阻擋
   if(conflicts.length>0 && wd>=5){
-    html+=`<div class="conflict-box">⛔ <b>工作日衝突</b><br>`;
+    blocked=true;
+    html+=`<div class="conflict-box">⛔ <b>工作日衝突，無法送出申請</b><br>`;
     for(const c of conflicts) html+=`與 ${c.name} 重疊 ${c.wd} 個工作日（${c.days[0]} ~ ${c.days[c.days.length-1]}）<br>`;
     html+=`</div>`;
     const busyDays=new Set(conflicts.flatMap(c=>c.days));
     const segments=getSuggestSegments(start,end,busyDays);
     if(segments.length>0){
-      html+=`<div class="suggest-box">📋 建議分段申請：<br>`;
+      html+=`<div class="suggest-box">📋 建議改為分段申請：<br>`;
       for(const seg of segments) html+=`${seg.start} – ${seg.end}（${seg.wd} 工作天）<br>`;
       html+=`💡 也可改用對調申請方式</div>`;
     }
   }
+
+  // 超過個人特休1/2 → 阻擋
   const total=getMemberLeave(m.id);
   const halfQuota=Math.floor(total/2);
-  if(wd>=5 && wd>halfQuota) html+=`<div class="alert alert-err">你已超過個人特休天數1/2（${halfQuota}天）</div>`;
+  if(wd>=5 && wd>halfQuota){
+    blocked=true;
+    html+=`<div class="alert alert-err">⛔ 長假天數超過個人特休1/2（上限 ${halfQuota} 天），無法送出</div>`;
+  }
+
+  // 本組已有長假名額 → 阻擋
   if(wd>=5){
     const longConflict=checkLongLeaveConflict(m.group,start,end,m.id);
-    if(longConflict) html+=`<div class="alert alert-err">該假期本組已有長假預約名額（${longConflict}）</div>`;
+    if(longConflict){
+      blocked=true;
+      html+=`<div class="alert alert-err">⛔ 本組已有長假預約名額（${longConflict}），無法送出</div>`;
+    }
   }
+
   document.getElementById('normalConflict').innerHTML=html;
   const used=usedLeave(m.id,new Date().getFullYear());
   document.getElementById('normalLeaveInfo').innerHTML=`<div class="text-sm">剩餘特休：${total-used}天 | 本次申請：${wd}天</div>`;
+
+  // 控制送出按鈕的啟用/停用狀態
+  const btn=document.getElementById('submitNormalBtn');
+  if(btn){
+    btn.disabled=blocked;
+    btn.style.opacity=blocked?'0.4':'1';
+    btn.style.cursor=blocked?'not-allowed':'pointer';
+    btn.textContent=blocked?'⛔ 無法送出（請先解決衝突）':'📤 送出申請';
+  }
 }
 
 function checkLongLeaveConflict(group,start,end,excludeId){
@@ -907,11 +938,27 @@ function submitNormal(){
   const total=getMemberLeave(m.id);
   if(wd>total){alert(`申請天數(${wd})超過特休總額(${total})`);return;}
   const halfQuota=Math.floor(total/2);
-  if(wd>=5&&wd>halfQuota){alert(`長假天數超過個人特休1/2(${halfQuota}天)`);return;}
+  if(wd>=5&&wd>halfQuota){alert(`⛔ 長假天數超過個人特休1/2（上限 ${halfQuota} 天）`);return;}
+
+  // 長假：檢查工作日衝突
   if(wd>=5){
+    const sameGroup=state.members.filter(x=>x.group===m.group && x.id!==m.id);
+    for(const other of sameGroup){
+      const otherApps=state.applications.filter(a=>a.applicantId===other.id && ['done','pending'].includes(a.status));
+      for(const app of otherApps){
+        const as=parseDate(app.startDate), ae=parseDate(app.endDate);
+        if(start<=ae && end>=as){
+          let overlap=0;
+          let d=new Date(Math.max(start,as));
+          while(d<=new Date(Math.min(end,ae))){ if(!isHoliday(d)) overlap++; d.setDate(d.getDate()+1); }
+          if(overlap>0){ alert(`⛔ 與 ${other.name} 有 ${overlap} 個工作日重疊，無法送出申請\n請改為分段申請或使用對調申請`); return; }
+        }
+      }
+    }
     const lc=checkLongLeaveConflict(m.group,start,end,m.id);
-    if(lc){alert('該假期本組已有長假預約名額（'+lc+'）');return;}
+    if(lc){alert(`⛔ 本組已有長假預約名額（${lc}），無法送出`);return;}
   }
+
   const app={
     id:'APP'+Date.now(),
     applicantId:m.id, applicantName:m.name, group:m.group,
@@ -925,6 +972,10 @@ function submitNormal(){
   document.getElementById('normalEnd').value='';
   document.getElementById('normalDayCount').innerHTML='';
   document.getElementById('normalConflict').innerHTML='';
+  document.getElementById('normalLeaveInfo').innerHTML='';
+  // 重置按鈕狀態
+  const btn=document.getElementById('submitNormalBtn');
+  if(btn){ btn.disabled=false; btn.style.opacity='1'; btn.textContent='📤 送出申請'; }
 }
 
 // ── SWAP ──
