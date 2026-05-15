@@ -195,8 +195,8 @@ tr:last-child td{border-bottom:none;}
       const toSave = {
         applications: stateObj.applications,
         members: stateObj.members,
-        adminPassword: stateObj.adminPassword,
-        systemOpen: stateObj.systemOpen !== false // 預設 true
+        adminPassword: stateObj.adminPassword
+        // 故意不存 calYear / calMonth / currentUserId
       };
       await _db.collection('state').doc('main').set({ data: JSON.stringify(toSave) });
     } catch(e) { console.error('Firebase save error', e); }
@@ -398,7 +398,6 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel active" id="atab-a-overview">
       <div class="grid-3" id="adminKpiCards" style="margin-bottom:16px;"></div>
-      <div id="conflictAlertCard" style="margin-bottom:14px;"></div>
       <div class="card">
         <div class="card-title">所有申請紀錄</div>
         <div class="filter-bar" id="adminRecordFilter">
@@ -443,10 +442,6 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel" id="atab-a-settings">
       <div class="card">
-        <div class="card-title">🔓 預約開關</div>
-        <div id="settingsSystemToggle"></div>
-      </div>
-      <div class="card" style="margin-top:14px;">
         <div class="card-title">🔑 變更管理員密碼</div>
         <div class="form-row"><label>目前密碼</label><input type="password" id="pwCurrent" placeholder="輸入目前密碼"></div>
         <div class="form-row"><label>新密碼</label><input type="password" id="pwNew" placeholder="輸入新密碼（至少4位）"></div>
@@ -589,7 +584,7 @@ function loadState(){
     if(s) return JSON.parse(s);
   }catch(e){}
   const members = [...RAW_A,...RAW_B].map(m=>({...m,customLeave:null}));
-  return {members, applications:[], currentUserId:null, calYear:new Date().getFullYear(), calMonth:new Date().getMonth(), adminPassword:'AF0713', systemOpen:true};
+  return {members, applications:[], currentUserId:null, calYear:new Date().getFullYear(), calMonth:new Date().getMonth(), adminPassword:'AF0713'};
 }
 
 // ── FIX 4: saveState 只把 business data 推到 Firebase，calYear/calMonth 只存 localStorage
@@ -624,32 +619,30 @@ function startFirebaseSync(){
       state.applications = remote.applications || [];
       state.members = remote.members || state.members;
       state.adminPassword = remote.adminPassword || state.adminPassword;
-      state.systemOpen = remote.systemOpen !== false;
+      // ── FIX 3: 不從 remote 恢復 calYear/calMonth，保持本機月曆視角
       state.currentUserId = null;
       try{ localStorage.setItem('leaveSystemState',JSON.stringify(state)); }catch(e){}
       renderCurrentTab();
-      renderSystemOpenBanner();
       showSyncBadge('☁️ 已從雲端載入');
     }
 
+    // 即時監聽其他裝置的變更
     window._fbListen((remote) => {
       if(_ignoreNext){ _ignoreNext=false; return; }
       if(!remote || !remote.members) return;
       const myUser = currentUserId;
-      const myCalYear = calYear;
+      const myCalYear = calYear;   // ── FIX 3: 保留本機月曆視角
       const myCalMonth = calMonth;
       state.applications = remote.applications || [];
       state.members = remote.members || state.members;
       state.adminPassword = remote.adminPassword || state.adminPassword;
-      state.systemOpen = remote.systemOpen !== false;
       state.currentUserId = myUser;
-      state.calYear = myCalYear;
+      state.calYear = myCalYear;   // 不被遠端覆蓋
       state.calMonth = myCalMonth;
       calYear = myCalYear;
       calMonth = myCalMonth;
       try{ localStorage.setItem('leaveSystemState',JSON.stringify(state)); }catch(e){}
       renderCurrentTab();
-      renderSystemOpenBanner();
       showSyncBadge('🔄 已同步更新');
     });
   });
@@ -846,12 +839,12 @@ function checkNormalConflict(startStr,endStr,wd){
   }
 
   let html='';
-  let blocked=false;
+  let blocked=false; // 是否阻擋送出
 
-  // 同組有人已預約重疊工作日 → 不論天數，一律阻擋
-  if(conflicts.length>0){
+  // 長假工作日衝突 → 阻擋
+  if(conflicts.length>0 && wd>=5){
     blocked=true;
-    html+=`<div class="conflict-box">⛔ <b>日期與同組成員重疊，無法送出申請</b><br>`;
+    html+=`<div class="conflict-box">⛔ <b>工作日衝突，無法送出申請</b><br>`;
     for(const c of conflicts) html+=`與 ${c.name} 重疊 ${c.wd} 個工作日（${c.days[0]} ~ ${c.days[c.days.length-1]}）<br>`;
     html+=`</div>`;
     const busyDays=new Set(conflicts.flatMap(c=>c.days));
@@ -863,7 +856,7 @@ function checkNormalConflict(startStr,endStr,wd){
     }
   }
 
-  // 超過個人特休1/2（長假才擋）
+  // 超過個人特休1/2 → 阻擋
   const total=getMemberLeave(m.id);
   const halfQuota=Math.floor(total/2);
   if(wd>=5 && wd>halfQuota){
@@ -871,7 +864,7 @@ function checkNormalConflict(startStr,endStr,wd){
     html+=`<div class="alert alert-err">⛔ 長假天數超過個人特休1/2（上限 ${halfQuota} 天），無法送出</div>`;
   }
 
-  // 本組已有長假名額（長假才擋）
+  // 本組已有長假名額 → 阻擋
   if(wd>=5){
     const longConflict=checkLongLeaveConflict(m.group,start,end,m.id);
     if(longConflict){
@@ -932,7 +925,6 @@ function getSuggestSegments(start,end,busyDays){
 function submitNormal(){
   const m=getCurrentUser();
   if(!m){alert('請先選擇用戶');return;}
-  if(state.systemOpen===false){alert('🔒 系統預約功能已暫停，如有疑問請洽主管');return;}
   const s=document.getElementById('normalStart').value;
   const e=document.getElementById('normalEnd').value;
   if(!s||!e){alert('請填寫日期');return;}
@@ -948,23 +940,21 @@ function submitNormal(){
   const halfQuota=Math.floor(total/2);
   if(wd>=5&&wd>halfQuota){alert(`⛔ 長假天數超過個人特休1/2（上限 ${halfQuota} 天）`);return;}
 
-  // 同組重疊工作日檢查（不論天數）
-  const sameGroup=state.members.filter(x=>x.group===m.group && x.id!==m.id);
-  for(const other of sameGroup){
-    const otherApps=state.applications.filter(a=>a.applicantId===other.id && ['done','pending'].includes(a.status));
-    for(const app of otherApps){
-      const as=parseDate(app.startDate), ae=parseDate(app.endDate);
-      if(start<=ae && end>=as){
-        let overlap=0;
-        let d=new Date(Math.max(start,as));
-        while(d<=new Date(Math.min(end,ae))){ if(!isHoliday(d)) overlap++; d.setDate(d.getDate()+1); }
-        if(overlap>0){ alert(`⛔ 與 ${other.name} 有 ${overlap} 個工作日重疊，無法送出申請\n請改選其他日期或使用對調申請`); return; }
+  // 長假：檢查工作日衝突
+  if(wd>=5){
+    const sameGroup=state.members.filter(x=>x.group===m.group && x.id!==m.id);
+    for(const other of sameGroup){
+      const otherApps=state.applications.filter(a=>a.applicantId===other.id && ['done','pending'].includes(a.status));
+      for(const app of otherApps){
+        const as=parseDate(app.startDate), ae=parseDate(app.endDate);
+        if(start<=ae && end>=as){
+          let overlap=0;
+          let d=new Date(Math.max(start,as));
+          while(d<=new Date(Math.min(end,ae))){ if(!isHoliday(d)) overlap++; d.setDate(d.getDate()+1); }
+          if(overlap>0){ alert(`⛔ 與 ${other.name} 有 ${overlap} 個工作日重疊，無法送出申請\n請改為分段申請或使用對調申請`); return; }
+        }
       }
     }
-  }
-
-  // 長假額外限制
-  if(wd>=5){
     const lc=checkLongLeaveConflict(m.group,start,end,m.id);
     if(lc){alert(`⛔ 本組已有長假預約名額（${lc}），無法送出`);return;}
   }
@@ -1024,7 +1014,6 @@ function calcSwapDays(){
 
 function submitSwap(){
   const m=getCurrentUser(); if(!m){alert('請先選擇用戶');return;}
-  if(state.systemOpen===false){alert('🔒 系統預約功能已暫停，如有疑問請洽主管');return;}
   if(!swapPartnerId){alert('請選擇對調人員');return;}
   const ms=document.getElementById('swapMyStart').value;
   const me=document.getElementById('swapMyEnd').value;
@@ -1091,34 +1080,7 @@ function renderRecordItem(a,isAdmin){
         <button class="btn btn-danger btn-sm" onclick="confirmSwap('${a.id}',false)">✗ 拒絕</button>`;
     }
   }
-
-  // 檢查此申請是否與同組其他人有工作日衝突
-  let conflictWarning='';
-  if(['done','pending'].includes(a.status)){
-    const aStart=parseDate(a.startDate), aEnd=parseDate(a.endDate);
-    const sameGroupApps=state.applications.filter(x=>
-      x.id!==a.id &&
-      x.applicantId!==a.applicantId &&
-      x.group===a.group &&
-      ['done','pending'].includes(x.status)
-    );
-    const conflictNames=[];
-    for(const other of sameGroupApps){
-      const os=parseDate(other.startDate), oe=parseDate(other.endDate);
-      if(aStart>oe || os>aEnd) continue;
-      let overlap=0;
-      let d=new Date(Math.max(aStart,os));
-      while(d<=new Date(Math.min(aEnd,oe))){ if(!isHoliday(d)) overlap++; d.setDate(d.getDate()+1); }
-      if(overlap>0) conflictNames.push(other.applicantName);
-    }
-    if(conflictNames.length>0){
-      conflictWarning=`<div style="margin-top:6px;padding:6px 10px;background:var(--red-light);border-radius:6px;font-size:12px;color:var(--red);border-left:3px solid var(--red);">
-        ⚠️ 與同組 <b>${[...new Set(conflictNames)].join('、')}</b> 日期重疊，請主管確認處理
-      </div>`;
-    }
-  }
-
-  return `<div class="record-item" style="${conflictWarning?'border:1px solid var(--red);':''}">
+  return `<div class="record-item">
     <div class="record-header">
       <div>
         <div class="record-name">${a.applicantName} <span class="badge badge-${(a.group||'A').toLowerCase()}">${a.group||'A'}組</span></div>
@@ -1128,7 +1090,6 @@ function renderRecordItem(a,isAdmin){
       </div>
       <span class="badge ${statusMap[a.status]||'badge-gray'}">${statusLabel(a.status)}</span>
     </div>
-    ${conflictWarning}
     <div class="record-footer">
       <span class="badge ${a.type==='swap'?'badge-purple':'badge-gray'}">${a.type==='swap'?'對調':'一般'}</span>
       <span class="text-sm">${a.appliedAt?a.appliedAt.slice(0,16).replace('T',' '):''}</span>
@@ -1301,143 +1262,14 @@ function closeAdminLogin(){
   document.getElementById('app').style.display='block';
   document.querySelectorAll('#tabBar .tab-item').forEach(t=>{t.classList.remove('active');if(t.dataset.tab==='apply')t.classList.add('active');});
 }
-function renderSystemOpenBanner(){
-  let banner = document.getElementById('systemOpenBanner');
-  if(state.systemOpen !== false) {
-    if(banner) banner.remove();
-    return;
-  }
-  if(!banner){
-    banner = document.createElement('div');
-    banner.id = 'systemOpenBanner';
-    banner.style.cssText = 'position:sticky;top:52px;z-index:98;background:#c53030;color:#fff;text-align:center;padding:10px 16px;font-size:13px;font-weight:600;letter-spacing:.3px;';
-    const tabBar = document.querySelector('.tab-bar');
-    if(tabBar) tabBar.insertAdjacentElement('afterend', banner);
-    else document.body.prepend(banner);
-  }
-  banner.textContent = '🔒 系統預約功能已暫停，如有疑問請洽主管';
-}
-
-function toggleSystemOpen(){
-  state.systemOpen = state.systemOpen === false ? true : false;
-  saveState();
-  renderSystemOpenBanner();
-  renderSettingsPanel();
-  const msg = state.systemOpen ? '✅ 預約功能已開放' : '🔒 預約功能已關閉，同仁無法送出申請';
-  alert(msg);
-}
-
-function renderSettingsPanel(){
-  const isOpen = state.systemOpen !== false;
-  const el = document.getElementById('settingsSystemToggle');
-  if(!el) return;
-  el.innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px;background:${isOpen?'var(--green-light)':'var(--red-light)'};border-radius:var(--radius-sm);border:1px solid ${isOpen?'#c6f6d5':'#fed7d7'};">
-      <div>
-        <div style="font-weight:600;color:${isOpen?'var(--green)':'var(--red)'};">${isOpen?'🟢 預約功能開放中':'🔴 預約功能已關閉'}</div>
-        <div class="text-sm" style="margin-top:2px;">${isOpen?'同仁可正常送出申請':'同仁無法送出新申請，但可查看紀錄'}</div>
-      </div>
-      <button class="btn ${isOpen?'btn-danger':'btn-success'}" onclick="toggleSystemOpen()">
-        ${isOpen?'🔒 關閉預約':'🔓 開放預約'}
-      </button>
-    </div>`;
-}
+function renderAdminPanel(){
   document.getElementById('app').style.display='none';
   document.getElementById('adminPanel').style.display='block';
   renderAdminKpiCards();
-  renderConflictAlert();
   renderAdminRecords('all');
   renderAdminPending();
   renderAdminMembers();
   renderKPI();
-  renderSettingsPanel();
-}
-
-// ── 衝突偵測：掃描所有同組重疊申請 ──
-function detectConflicts(){
-  const active = state.applications.filter(a=>['done','pending'].includes(a.status));
-  const conflicts = [];
-  // 比對每一對申請
-  for(let i=0; i<active.length; i++){
-    for(let j=i+1; j<active.length; j++){
-      const a = active[i], b = active[j];
-      if(a.applicantId === b.applicantId) continue; // 同一人跳過
-      if(a.group !== b.group) continue;             // 不同組跳過
-      const as=parseDate(a.startDate), ae=parseDate(a.endDate);
-      const bs=parseDate(b.startDate), be=parseDate(b.endDate);
-      if(as>be || bs>ae) continue; // 沒有日期重疊
-      // 計算工作日重疊
-      const overlapDays=[];
-      let d=new Date(Math.max(as,bs));
-      while(d<=new Date(Math.min(ae,be))){ if(!isHoliday(d)) overlapDays.push(fmtDate(d)); d.setDate(d.getDate()+1); }
-      if(overlapDays.length>0){
-        conflicts.push({
-          a, b,
-          overlapDays,
-          overlapWd: overlapDays.length,
-          overlapStart: overlapDays[0],
-          overlapEnd: overlapDays[overlapDays.length-1]
-        });
-      }
-    }
-  }
-  return conflicts;
-}
-
-function renderConflictAlert(){
-  const conflicts = detectConflicts();
-  const el = document.getElementById('conflictAlertCard');
-  if(!el) return;
-  if(conflicts.length===0){
-    el.innerHTML='';
-    return;
-  }
-  let html=`<div class="card" style="border:2px solid var(--red);background:var(--red-light);">
-    <div class="card-title" style="color:var(--red);display:flex;align-items:center;justify-content:space-between;">
-      <span>⚠️ 偵測到 ${conflicts.length} 組同組日期衝突</span>
-    </div>`;
-  for(const c of conflicts){
-    const earlier = c.a.appliedAt <= c.b.appliedAt ? c.a : c.b;
-    const later   = c.a.appliedAt <= c.b.appliedAt ? c.b : c.a;
-    html+=`<div style="background:#fff;border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;border-left:4px solid var(--red);">
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
-        <span class="badge badge-${(earlier.group||'A').toLowerCase()}">${earlier.group}組</span>
-        <b>${earlier.applicantName}</b>
-        <span class="text-sm">${earlier.startDate}~${earlier.endDate}（${earlier.workdays}天）</span>
-        <span class="badge ${earlier.status==='done'?'badge-green':'badge-yellow'}">${statusLabel(earlier.status)}</span>
-      </div>
-      <div style="font-size:12px;color:var(--red);margin:4px 0 6px 0;">
-        ↕ 與同組 <b>${later.applicantName}</b> 重疊 <b>${c.overlapWd}</b> 個工作日（${c.overlapStart} ~ ${c.overlapEnd}）
-      </div>
-      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-        <span class="badge badge-${(later.group||'A').toLowerCase()}">${later.group}組</span>
-        <b>${later.applicantName}</b>
-        <span class="text-sm">${later.startDate}~${later.endDate}（${later.workdays}天）</span>
-        <span class="badge ${later.status==='done'?'badge-green':'badge-yellow'}">${statusLabel(later.status)}</span>
-      </div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <span class="text-sm" style="align-self:center;">先申請者：<b>${earlier.applicantName}</b>（${earlier.appliedAt.slice(0,16).replace('T',' ')}）</span>
-        <button class="btn btn-danger btn-sm" onclick="rejectConflict('${later.id}')">✗ 退件後者（${later.applicantName}）</button>
-        <button class="btn btn-danger btn-sm" style="background:var(--orange);" onclick="rejectConflict('${earlier.id}')">✗ 退件前者（${earlier.applicantName}）</button>
-      </div>
-    </div>`;
-  }
-  html+=`</div>`;
-  el.innerHTML=html;
-}
-
-function rejectConflict(id){
-  const app=state.applications.find(a=>a.id===id); if(!app) return;
-  const name=app.applicantName;
-  if(!confirm(`確定退件 ${name} 的申請（${app.startDate}~${app.endDate}）？`)) return;
-  app.status='rejected';
-  app.history.push({at:new Date().toISOString(), note:'主管退件：同組日期衝突'});
-  saveState();
-  renderConflictAlert();
-  renderAdminRecords(adminRecordFilter2);
-  renderAdminPending();
-  renderAdminKpiCards();
-  alert(`已退件 ${name} 的申請`);
 }
 function closeAdmin(){
   document.getElementById('adminPanel').style.display='none';
@@ -1486,7 +1318,6 @@ function approveApp(id,status){
   renderAdminRecords(adminRecordFilter2);
   renderAdminPending();
   renderAdminKpiCards();
-  renderConflictAlert();
   renderRecords(recordFilter);
   renderCalendar();
 }
@@ -1704,7 +1535,7 @@ function init(){
     if(el){el.min=today;el.max=maxDate;}
   });
   renderCalendar();
-  renderSystemOpenBanner();
+  // ── FIX 1: 啟動後立即連接 Firebase，從雲端拉取最新資料並開始監聽
   startFirebaseSync();
 }
 
