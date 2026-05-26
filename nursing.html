@@ -1,0 +1,1628 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="手術室護理">
+<meta name="theme-color" content="#0d47a1">
+<meta name="description" content="恩主公醫院手術室護理人員資歷與證照管理系統">
+<title>手術室護理人員管理系統</title>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'PingFang TC','Microsoft JhengHei',sans-serif;font-size:14px;color:#1a1a2e}
+:root{
+  --primary:#1565c0;--primary-dark:#0d47a1;--primary-light:#e3f2fd;
+  --success:#2e7d32;--success-light:#e8f5e9;
+  --warn:#e65100;--warn-light:#fff3e0;
+  --danger:#c62828;--danger-light:#ffebee;
+  --purple:#4527a0;--purple-light:#ede7f6;
+  --teal:#00695c;--teal-light:#e0f2f1;
+  --gray:#546e7a;--gray-light:#eceff1;
+  --border:#dde3ea;--bg:#f0f2f5;--surface:#ffffff;
+  --sidebar-w:220px;--topbar-h:52px;--bottom-nav-h:60px;
+}
+
+/* ── Layout ─────────────────────────── */
+.app{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+
+/* Top bar */
+.topbar{height:var(--topbar-h);background:var(--primary-dark);color:#fff;display:flex;align-items:center;gap:10px;padding:0 16px;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.3);position:relative;z-index:30}
+.topbar-logo{font-size:15px;font-weight:700;display:flex;align-items:center;gap:7px;flex:1;min-width:0}
+.topbar-logo svg{width:20px;height:20px;fill:#fff;opacity:.9;flex-shrink:0}
+.topbar-title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar-sub{font-size:11px;opacity:.65;margin-left:4px;display:none}
+.topbar-date{font-size:11px;opacity:.75;white-space:nowrap;flex-shrink:0}
+.topbar-actions{display:flex;gap:6px;flex-shrink:0}
+.topbar-btn{padding:5px 11px;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);border-radius:6px;color:#fff;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;transition:background .15s;font-family:inherit}
+.topbar-btn:hover,.topbar-btn:active{background:rgba(255,255,255,.28)}
+.menu-btn{display:none;background:none;border:none;color:#fff;cursor:pointer;padding:6px;border-radius:6px}
+.menu-btn:active{background:rgba(255,255,255,.2)}
+
+/* Body wrap */
+.body-wrap{display:flex;flex:1;overflow:hidden}
+
+/* Sidebar – desktop */
+.sidebar{width:var(--sidebar-w);background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;transition:transform .25s ease;z-index:20}
+.sidebar-section{padding:12px 10px 5px;font-size:10px;font-weight:600;color:#90a4ae;letter-spacing:1px;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:9px;padding:10px 14px;cursor:pointer;border-left:3px solid transparent;color:var(--gray);font-size:13px;transition:all .15s;margin:1px 0;user-select:none}
+.nav-item svg{width:16px;height:16px;flex-shrink:0;opacity:.65}
+.nav-item:hover,.nav-item:active{background:var(--primary-light);color:var(--primary)}
+.nav-item.active{background:var(--primary-light);color:var(--primary);border-left-color:var(--primary);font-weight:600}
+.nav-item.active svg{opacity:1}
+.nav-label{flex:1}
+.nav-badge{background:var(--danger);color:#fff;font-size:10px;border-radius:10px;padding:1px 6px;font-weight:600;min-width:18px;text-align:center}
+.nav-badge.warn{background:var(--warn)}
+.sidebar-footer{margin-top:auto;padding:10px;border-top:1px solid var(--border);font-size:11px;color:#90a4ae;text-align:center}
+
+/* Overlay for mobile sidebar */
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:19}
+
+/* Bottom nav – mobile only */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:var(--bottom-nav-h);background:#fff;border-top:1px solid var(--border);z-index:25;padding:0 4px;padding-bottom:env(safe-area-inset-bottom)}
+.bnav-wrap{display:flex;height:100%}
+.bnav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:#90a4ae;font-size:9px;padding:4px 2px;border-radius:8px;transition:color .15s;position:relative;user-select:none}
+.bnav-item svg{width:20px;height:20px}
+.bnav-item.active{color:var(--primary)}
+.bnav-item .bnav-badge{position:absolute;top:4px;right:calc(50% - 16px);background:var(--danger);color:#fff;font-size:9px;border-radius:8px;padding:0 4px;min-width:14px;text-align:center;line-height:14px}
+
+/* Main content */
+.main{flex:1;overflow-y:auto;padding:16px;-webkit-overflow-scrolling:touch}
+
+/* ── Cards & KPIs ─────────────────── */
+.page-title{font-size:17px;font-weight:700;color:#1a1a2e;margin-bottom:3px}
+.page-sub{font-size:12px;color:#78909c;margin-bottom:14px}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:#fff;border-radius:10px;padding:12px 14px;border:1px solid var(--border);position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%}
+.kpi.blue::before{background:var(--primary)}.kpi.green::before{background:var(--success)}
+.kpi.orange::before{background:var(--warn)}.kpi.red::before{background:var(--danger)}
+.kpi.purple::before{background:var(--purple)}.kpi.teal::before{background:var(--teal)}
+.kpi-label{font-size:11px;color:#78909c;margin-bottom:5px}
+.kpi-val{font-size:24px;font-weight:700;line-height:1;color:#1a1a2e}
+.kpi-sub{font-size:10px;color:#90a4ae;margin-top:3px;line-height:1.5}
+.card{background:#fff;border-radius:10px;border:1px solid var(--border);margin-bottom:14px;overflow:hidden}
+.card-header{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.card-title{font-size:13px;font-weight:600;color:#37474f;display:flex;align-items:center;gap:5px}
+.card-body{padding:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+/* ── Alerts ─────────────────────────── */
+.alert{padding:9px 12px;border-radius:8px;font-size:12px;display:flex;align-items:center;gap:7px;margin-bottom:10px;border-left:4px solid}
+.alert-danger{background:var(--danger-light);color:var(--danger);border-color:var(--danger)}
+.alert-warn{background:var(--warn-light);color:var(--warn);border-color:var(--warn)}
+
+/* ── Toolbar ─────────────────────────── */
+.toolbar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.toolbar input[type=text]{padding:8px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;flex:1;min-width:120px;transition:border .15s}
+.toolbar input[type=text]:focus{border-color:var(--primary)}
+.toolbar select{padding:8px 9px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;background:#fff;outline:none;cursor:pointer}
+.toolbar-right{display:flex;gap:6px;margin-left:auto}
+
+/* ── Buttons ─────────────────────────── */
+.btn{padding:8px 13px;border-radius:8px;font-size:12px;font-family:inherit;cursor:pointer;display:inline-flex;align-items:center;gap:5px;border:1px solid;transition:all .15s;font-weight:500;white-space:nowrap;-webkit-appearance:none}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-success{background:var(--teal);color:#fff;border-color:var(--teal)}
+.btn-success:hover{background:#004d40}
+.btn-outline{background:#fff;color:#546e7a;border-color:var(--border)}
+.btn-outline:hover{background:var(--bg)}
+.btn-danger{background:var(--danger-light);color:var(--danger);border-color:#ef9a9a}
+.btn-danger:hover{background:#ffcdd2}
+.btn-sm{padding:5px 9px;font-size:11px}
+
+/* ── Table ─────────────────────────── */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{padding:9px 10px;background:#f5f7fa;font-size:11px;font-weight:600;color:#546e7a;text-align:left;border-bottom:2px solid var(--border);white-space:nowrap}
+tbody td{padding:8px 10px;border-bottom:1px solid #f0f2f5;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#fafbfc}
+.td-muted{font-size:11px;color:#90a4ae}
+tfoot td{padding:8px 10px;background:#f5f7fa;border-top:2px solid var(--border)}
+
+/* ── Badges ─────────────────────────── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.ok{background:var(--success-light);color:var(--success)}
+.soon{background:var(--warn-light);color:var(--warn)}
+.exp{background:var(--danger-light);color:var(--danger)}
+.none{background:var(--gray-light);color:var(--gray)}
+.b-blue{background:var(--primary-light);color:var(--primary)}
+.b-purple{background:var(--purple-light);color:var(--purple)}
+.b-teal{background:var(--teal-light);color:var(--teal)}
+
+/* ── Progress ─────────────────────── */
+.prog-wrap{background:#eceff1;border-radius:4px;height:7px;overflow:hidden;min-width:50px}
+.prog-fill{height:100%;border-radius:4px;transition:width .5s}
+.prog-ok{background:var(--success)}.prog-soon{background:var(--warn)}.prog-exp{background:var(--danger)}
+
+/* ── Bar chart inline ─────────────── */
+.bar-row{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.bar-lbl{width:60px;font-size:11px;color:#78909c;text-align:right;flex-shrink:0}
+.bar-track{flex:1;background:#eceff1;border-radius:4px;height:17px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:6px;font-size:10px;font-weight:600;color:#fff;transition:width .5s}
+.bar-n{width:24px;font-size:11px;font-weight:600;color:#37474f;text-align:right}
+
+/* ── Modal ─────────────────────────── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center;z-index:1000;padding:0}
+.modal{background:#fff;border-radius:16px 16px 0 0;padding:20px 18px 28px;width:100%;max-width:600px;max-height:92vh;max-height:92dvh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,.2);animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(60px);opacity:0}to{transform:translateY(0);opacity:1}}
+.modal-handle{width:36px;height:4px;background:#dde3ea;border-radius:2px;margin:0 auto 14px}
+.modal-title{font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:16px;display:flex;align-items:center;gap:7px;padding-bottom:10px;border-bottom:1px solid var(--border)}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:9px}
+.form-field label{font-size:11px;font-weight:600;color:#546e7a;display:block;margin-bottom:3px}
+.form-field input,.form-field select,.form-field textarea{width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;outline:none;transition:border .15s;background:#fff;color:#1a1a2e;-webkit-appearance:none}
+.form-field input:focus,.form-field select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(21,101,192,.1)}
+.form-section{font-size:11px;font-weight:600;color:#90a4ae;text-transform:uppercase;letter-spacing:.8px;margin:13px 0 7px;padding-top:11px;border-top:1px solid var(--border)}
+
+/* ── Lock screen ─────────────────── */
+.lock-screen{display:flex;align-items:center;justify-content:center;flex:1;padding:32px 16px}
+.lock-card{background:#fff;border-radius:16px;padding:32px 24px;width:100%;max-width:320px;text-align:center;border:1px solid var(--border);box-shadow:0 4px 24px rgba(0,0,0,.07)}
+.lock-icon{font-size:44px;margin-bottom:10px}
+.lock-title{font-size:16px;font-weight:700;margin-bottom:5px}
+.lock-sub{font-size:13px;color:#78909c;margin-bottom:18px;line-height:1.6}
+.lock-input{width:100%;padding:12px;border:1px solid var(--border);border-radius:9px;font-size:22px;text-align:center;letter-spacing:8px;outline:none;margin-bottom:10px;font-family:inherit;-webkit-appearance:none}
+.lock-input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(21,101,192,.1)}
+.lock-err{color:var(--danger);font-size:12px;min-height:18px;margin-bottom:8px}
+
+/* ── Inner tabs ─────────────────── */
+.inner-tabs{display:flex;gap:2px;border-bottom:2px solid var(--border);margin-bottom:14px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.inner-tabs::-webkit-scrollbar{display:none}
+.itab{padding:7px 13px;font-size:12px;font-weight:500;cursor:pointer;color:#78909c;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:all .15s}
+.itab.active{color:var(--primary);border-bottom-color:var(--primary)}
+
+/* ── Stat boxes ─────────────────── */
+.stat-box{background:var(--bg);border-radius:8px;padding:11px;text-align:center}
+.stat-box-val{font-size:20px;font-weight:700;line-height:1.1}
+.stat-box-lbl{font-size:11px;color:#78909c;margin-top:3px}
+
+/* ── Toast ─────────────────────── */
+#toast{position:fixed;bottom:calc(var(--bottom-nav-h) + 12px);left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;z-index:2000;opacity:0;transition:opacity .3s;pointer-events:none;display:flex;align-items:center;gap:7px;box-shadow:0 4px 20px rgba(0,0,0,.3);white-space:nowrap;max-width:90vw}
+
+/* ── Modal footer ─────────────── */
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+
+/* ── Scrollbar ─────────────────── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:#f0f2f5}
+::-webkit-scrollbar-thumb{background:#cfd8dc;border-radius:3px}
+
+/* ── Print ─────────────────────── */
+@media print{.sidebar,.topbar-btn,.btn,.toolbar-right,.bottom-nav,.menu-btn{display:none!important}.main{padding:0}}
+
+/* ══════════════════════════════════
+   RESPONSIVE BREAKPOINTS
+══════════════════════════════════ */
+
+/* ── Tablet (≤900px): narrower sidebar */
+@media(max-width:900px){
+  :root{--sidebar-w:190px}
+  .topbar-sub{display:none}
+  .main{padding:12px}
+}
+
+/* ── Mobile (≤680px): bottom nav, no sidebar */
+@media(max-width:680px){
+  .sidebar{position:fixed;top:var(--topbar-h);left:0;bottom:0;transform:translateX(-100%);box-shadow:4px 0 20px rgba(0,0,0,.15)}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay.open{display:block}
+  .menu-btn{display:flex;align-items:center;justify-content:center}
+  .bottom-nav{display:flex}
+  .main{padding:10px 10px calc(var(--bottom-nav-h) + 10px);padding-bottom:calc(var(--bottom-nav-h) + 10px + env(safe-area-inset-bottom))}
+  #toast{bottom:calc(var(--bottom-nav-h) + 8px)}
+  .kpi-row{grid-template-columns:1fr 1fr}
+  .kpi-val{font-size:20px}
+  .grid2{grid-template-columns:1fr}
+  .grid3{grid-template-columns:1fr}
+  .form-grid{grid-template-columns:1fr}
+  .page-title{font-size:15px}
+  .toolbar{gap:6px}
+  .toolbar-right{margin-left:0;width:100%}
+  .toolbar-right .btn{flex:1;justify-content:center}
+  .topbar-actions .topbar-btn:not(:last-child){display:none}
+  .topbar-date{display:none}
+  table{font-size:11px}
+  thead th{padding:7px 7px;font-size:10px}
+  tbody td{padding:6px 7px}
+}
+
+/* ── Small mobile (≤380px) */
+@media(max-width:380px){
+  .kpi-row{grid-template-columns:1fr 1fr}
+  .kpi{padding:10px 11px}
+  .kpi-val{font-size:18px}
+  .btn{padding:7px 10px;font-size:11px}
+}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;padding-top:12px;border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <button class="menu-btn" onclick="toggleSidebar()" aria-label="選單">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+    </button>
+    <div class="topbar-logo">
+      <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+      <span class="topbar-title">手術室護理人員管理系統</span>
+      <span class="topbar-sub">恩主公醫院</span>
+    </div>
+    <span class="topbar-date" id="topbar-date"></span>
+    <span id="sync-indicator" style="font-size:11px;opacity:.9;flex-shrink:0;margin-left:2px"></span>
+    <div class="topbar-actions">
+      <button class="topbar-btn" onclick="loadFromFirebase()">🔄 同步</button>
+      <button class="topbar-btn" onclick="exportCSV('staff')">⬇ 匯出</button>
+      <button class="topbar-btn" onclick="window.print()">🖨 列印</button>
+    </div>
+  </div>
+
+  <div class="body-wrap">
+    <!-- Sidebar overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-section">主要功能</div>
+      <div class="nav-item active" onclick="nav(0)" id="nav0">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        <span class="nav-label">首頁總覽</span>
+      </div>
+      <div class="nav-item" onclick="nav(1)" id="nav1">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+        <span class="nav-label">人員明細總表</span>
+      </div>
+      <div class="nav-item" onclick="nav(2)" id="nav2">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>
+        <span class="nav-label">人員通訊表 🔒</span>
+      </div>
+      <div class="nav-item" onclick="nav(3)" id="nav3">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+        <span class="nav-label">急救證照</span>
+        <span class="nav-badge warn" id="nb3" style="display:none"></span>
+      </div>
+      <div class="nav-item" onclick="nav(4)" id="nav4">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <span class="nav-label">壓力鍋技術士</span>
+      </div>
+      <div class="sidebar-section">分析報告</div>
+      <div class="nav-item" onclick="nav(5)" id="nav5">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+        <span class="nav-label">統計分析</span>
+      </div>
+      <div class="nav-item" onclick="nav(6)" id="nav6">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+        <span class="nav-label">離職率分析</span>
+      </div>
+      <div class="sidebar-footer">v2.1 RWD &nbsp;|&nbsp; 2026/05/25</div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main" id="main"></div>
+  </div>
+</div>
+
+<!-- Bottom Nav (mobile only) -->
+<div class="bottom-nav">
+  <div class="bnav-wrap">
+    <div class="bnav-item active" onclick="nav(0)" id="bnav0">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      首頁
+    </div>
+    <div class="bnav-item" onclick="nav(1)" id="bnav1">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+      人員
+    </div>
+    <div class="bnav-item" onclick="nav(3)" id="bnav3">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+      急救
+      <span class="bnav-badge" id="nbb3" style="display:none"></span>
+    </div>
+    <div class="bnav-item" onclick="nav(5)" id="bnav5">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/></svg>
+      統計
+    </div>
+    <div class="bnav-item" onclick="nav(6)" id="bnav6">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+      離職
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+
+// ── Inline minimal chart renderer (no CDN needed) ──────────────
+window.Chart = (function(){
+  const COLORS=['#1565c0','#c62828','#185fa5','#4527a0','#00695c','#e65100','#546e7a','#2e7d32'];
+  function Chart(canvas, config){
+    this.canvas=canvas; this.config=config;
+    this._draw();
+  }
+  Chart.prototype.destroy=function(){
+    if(this.canvas) this.canvas.getContext('2d').clearRect(0,0,this.canvas.width,this.canvas.height);
+  };
+  Chart.prototype._draw=function(){
+    const c=this.canvas, cfg=this.config;
+    if(!c) return;
+    const ctx=c.getContext('2d');
+    const W=c.parentElement?c.parentElement.offsetWidth||360:360;
+    const H=c.parentElement?c.parentElement.offsetHeight||200:200;
+    c.width=W; c.height=H;
+    const data=cfg.data, opts=cfg.options||{};
+    const labels=data.labels||[];
+    const datasets=data.datasets||[];
+    // Margins
+    const ml=48,mr=48,mt=16,mb=32;
+    const cw=W-ml-mr, ch=H-mt-mb;
+    if(cw<=0||ch<=0) return;
+
+    // Collect bar+line datasets
+    const barDS=datasets.filter(d=>!d.type||d.type==='bar');
+    const lineDS=datasets.filter(d=>d.type==='line');
+
+    // Compute stacked max for bars (y axis)
+    const barTotals=labels.map((_,i)=>barDS.reduce((s,d)=>s+(d.data[i]||0),0));
+    const lineVals=lineDS.flatMap(d=>d.data||[]).filter(v=>v!=null);
+    const barMax=Math.max(...barTotals,1);
+    const lineMax=lineDS.length?Math.max(...lineVals,1):0;
+
+    // Grid lines
+    ctx.strokeStyle='#f0f2f5'; ctx.lineWidth=1;
+    for(let i=0;i<=4;i++){
+      const y=mt+ch-(ch*i/4);
+      ctx.beginPath(); ctx.moveTo(ml,y); ctx.lineTo(W-mr,y); ctx.stroke();
+    }
+
+    // Y axis labels (left - bar)
+    ctx.fillStyle='#90a4ae'; ctx.font='10px -apple-system,sans-serif'; ctx.textAlign='right';
+    for(let i=0;i<=4;i++){
+      const y=mt+ch-(ch*i/4);
+      const val=Math.round(barMax*i/4);
+      ctx.fillText(val,ml-4,y+3);
+    }
+
+    // Y axis labels (right - line, if exists)
+    if(lineDS.length){
+      ctx.textAlign='left';
+      for(let i=0;i<=4;i++){
+        const y=mt+ch-(ch*i/4);
+        const val=(lineMax*i/4).toFixed(1);
+        ctx.fillText(val+'%',W-mr+4,y+3);
+      }
+    }
+
+    // Draw bars (stacked)
+    const bw=Math.max(8,Math.min(40,cw/labels.length*0.6));
+    const gap=cw/labels.length;
+    labels.forEach((lbl,i)=>{
+      let yBase=mt+ch;
+      barDS.forEach((ds,di)=>{
+        const val=ds.data[i]||0;
+        if(val===0) return;
+        const bh=ch*val/barMax;
+        const x=ml+gap*i+gap/2-bw/2;
+        ctx.fillStyle=ds.backgroundColor||COLORS[di%COLORS.length];
+        ctx.strokeStyle=ds.borderColor||'transparent';
+        ctx.lineWidth=ds.borderWidth||0;
+        ctx.fillRect(x,yBase-bh,bw,bh);
+        if(ds.borderWidth) ctx.strokeRect(x,yBase-bh,bw,bh);
+        yBase-=bh;
+      });
+    });
+
+    // Draw lines
+    lineDS.forEach((ds,li)=>{
+      const pts=ds.data||[];
+      const yAxis=ds.yAxisID==='y2';
+      const maxV=yAxis?lineMax:barMax;
+      ctx.strokeStyle=ds.borderColor||COLORS[(barDS.length+li)%COLORS.length];
+      ctx.lineWidth=ds.borderWidth||2;
+      ctx.setLineDash(ds.borderDash||[]);
+      ctx.beginPath();
+      pts.forEach((v,i)=>{
+        if(v==null) return;
+        const x=ml+cw/labels.length*i+cw/labels.length/2;
+        const y=mt+ch-ch*v/maxV;
+        i===0||pts.slice(0,i).every(p=>p==null)?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      });
+      ctx.stroke();
+      ctx.setLineDash([]);
+      // Points
+      if(ds.pointRadius>0){
+        pts.forEach((v,i)=>{
+          if(v==null) return;
+          const x=ml+cw/labels.length*i+cw/labels.length/2;
+          const y=mt+ch-ch*v/Math.max(maxV,1);
+          ctx.beginPath(); ctx.arc(x,y,ds.pointRadius||3,0,Math.PI*2);
+          ctx.fillStyle=ds.pointBackgroundColor||ds.borderColor;
+          ctx.fill();
+        });
+      }
+    });
+
+    // X labels
+    ctx.fillStyle='#546e7a'; ctx.font='10px -apple-system,sans-serif'; ctx.textAlign='center';
+    labels.forEach((lbl,i)=>{
+      const x=ml+gap*i+gap/2;
+      ctx.fillText(lbl,x,H-4);
+    });
+  };
+  return Chart;
+})();
+
+// ═══════════════════════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════════════════════
+const TODAY = new Date('2026-05-25');
+const CONTACT_PIN = '1j6ul4';
+const ADD_PIN = '1j6ul4';
+let activeTab = 0;
+let contactUnlocked = false;
+let statsSubTab = 0;
+let chartInstances = {};
+
+const TITLE_ORDER = ['護理長','副護理長','組長','護理師','護士','助理員','實習護理師'];
+
+let staff = [
+  {id:'10273',name:'王婷婷',title:'副護理長',level:'N3',edu:'大學',school:'元培',joinDate:'1997-08-01',licType:'護理師',bls:'2027-03-13',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'64664',id_no:'F223872940',phone:'0930-655723',emergency:'0919975217',location:'楊梅市',email:'10273@km.eck.org.tw',inService:false,resigned:false},
+  {id:'10361',name:'李靜怡',title:'組長',level:'N2',edu:'大學',school:'元培',joinDate:'1997-08-16',licType:'護理師',bls:'2027-01-06',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'82403',id_no:'F223801316',phone:'0921-080-981',emergency:'0932251149',location:'三峽區',email:'jean09252001@yahoo.com.tw',inService:false,resigned:false},
+  {id:'10367',name:'張瑋恩',title:'護理師',level:'N2',edu:'專科',school:'',joinDate:'1997-08-16',licType:'護理師',bls:'2027-02-03',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'64666',id_no:'A224089131',phone:'0932-863413',emergency:'0988586344',location:'鶯歌區',email:'wei9657@gmail.com',inService:false,resigned:false},
+  {id:'10740',name:'李佳容',title:'護理師',level:'N2',edu:'大學',school:'大仁',joinDate:'1998-04-02',licType:'護理師',bls:'2027-08-04',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'64673',id_no:'A221876365',phone:'0918-406526',emergency:'0939130458',location:'鶯歌.樹林區',email:'cj09052001@yahoo.com.tw',inService:false,resigned:false},
+  {id:'10746',name:'王玉仙',title:'組長',level:'N3',edu:'大學',school:'長庚',joinDate:'1998-04-13',licType:'護理師',bls:'2027-09-24',acls:null,als:null,presFirst:'099-015296',presFirstDate:'2021-04-12',presSmall:'',presSmallDate:'',nursing_member:'64670',id_no:'F225962189',phone:'0972-923098',emergency:'009-6681-209-6888',location:'住宿407',email:'10746@eck.org.tw',inService:false,resigned:false},
+  {id:'10922',name:'陳玉茹',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'1998-09-01',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'48833',id_no:'L222364336',phone:'0938-038665',emergency:'0929297462',location:'三峽區',email:'kerichen10922@gmail.com',inService:false,resigned:false},
+  {id:'11192',name:'蕭帆妤',title:'護理長',level:'N4',edu:'大學',school:'大仁',joinDate:'1999-08-05',licType:'護理師',bls:'2027-02-12',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'64659',id_no:'F224382454',phone:'0972-863820',emergency:'0916227419',location:'台北市',email:'smallpapas@yahoo.com.tw',inService:false,resigned:false},
+  {id:'11468',name:'盧貞君',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'2000-07-03',licType:'護理師',bls:'2025-09-11',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'0972-812881',emergency:'0989977612',location:'三峽區',email:'vickymaumau@gmail.com',inService:false,resigned:false},
+  {id:'11598',name:'羅秀如',title:'組長',level:'N3',edu:'大學',school:'元培',joinDate:'2001-04-18',licType:'護理師',bls:'2027-01-06',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'75523',id_no:'L222255172',phone:'0936-339984',emergency:'0912831866',location:'三峽區',email:'pailu1120@gmail.com',inService:false,resigned:false},
+  {id:'12295',name:'林奕辰',title:'護理師',level:'N2',edu:'專科',school:'',joinDate:'2004-10-21',licType:'護理師',bls:'2027-04-22',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'67216',id_no:'F224479818',phone:'0920-646057',emergency:'0912130064',location:'三峽區',email:'lin7819@yahoo.com.tw',inService:false,resigned:false},
+  {id:'12483',name:'林靜子',title:'護理師',level:'N2',edu:'專科',school:'',joinDate:'2005-09-02',licType:'護理師',bls:'2027-02-03',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'65571',id_no:'T222712802',phone:'0972-860934',emergency:'0928601201',location:'觀音區',email:'tzu972860934@gmail.com',inService:false,resigned:false},
+  {id:'12847',name:'郭妍伶',title:'護理師',level:'N2',edu:'專科',school:'',joinDate:'2007-07-02',licType:'護理師',bls:'2028-03-25',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'115857',id_no:'F224164161',phone:'0938-997252',emergency:'0938966258',location:'八德市',email:'pizza997011271@gmail.com',inService:false,resigned:false},
+  {id:'13288',name:'王嘉羚',title:'護理師',level:'N1',edu:'大學',school:'',joinDate:'2010-01-04',licType:'護理師',bls:'2027-04-22',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'130902',id_no:'F226164598',phone:'0928-282109',emergency:'0988865342',location:'三峽區',email:'louise5875@gmail.com',inService:false,resigned:false},
+  {id:'13565',name:'程郁淳',title:'護理師',level:'N2',edu:'專科',school:'',joinDate:'2011-06-16',licType:'護理師',bls:'2027-02-03',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'69973',id_no:'M221355156',phone:'0926-169989',emergency:'0911-691-687',location:'八德市',email:'cheng00409@gmail.com',inService:false,resigned:false},
+  {id:'14040',name:'黃怡婷',title:'護士',level:'N1',edu:'專科',school:'',joinDate:'2013-05-21',licType:'護士',bls:'2027-04-22',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'122064',id_no:'P223220532',phone:'0919-351650',emergency:'0952981966',location:'三峽區',email:'et1029z@yahoo.com.tw',inService:false,resigned:false},
+  {id:'14055',name:'洪怡婷',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'2013-06-17',licType:'護理師',bls:'2028-04-21',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'147383',id_no:'T223687853',phone:'0918-760638',emergency:'0919334912',location:'鶯歌區',email:'ating90236@yahoo.com.tw',inService:false,resigned:false},
+  {id:'14190',name:'楊衣甄',title:'護理師',level:'N1',edu:'大學',school:'元培',joinDate:'2013-11-18',licType:'護理師',bls:'2027-06-02',acls:null,als:null,presFirst:'009-005804',presFirstDate:'2016-10-18',presSmall:'095020',presSmallDate:'2016-08-16',nursing_member:'',id_no:'',phone:'0931-933610',emergency:'0920350869',location:'三峽區',email:'eck14190@gmail.com',inService:false,resigned:false},
+  {id:'14444',name:'李宜鵑',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'2014-11-17',licType:'護理師',bls:'2028-04-21',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'165208',id_no:'F225752530',phone:'0925-195510',emergency:'0983289631',location:'鶯歌區',email:'yinkopc320@yahoo.com.tw',inService:false,resigned:false},
+  {id:'14492',name:'謝佩芳',title:'護理師',level:'N1',edu:'大學',school:'元培',joinDate:'2015-03-23',licType:'護理師',bls:'2027-08-20',acls:null,als:null,presFirst:'099-008622',presFirstDate:'2018-04-20',presSmall:'095019',presSmallDate:'2016-08-06',nursing_member:'122441',id_no:'P222374666',phone:'0912-826838',emergency:'0918421760',location:'板橋/住宿(511)',email:'kikilala15@yahoo.com.tw',inService:false,resigned:false},
+  {id:'14536',name:'張佩琪',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'2015-05-25',licType:'護理師',bls:'2028-03-25',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'172503',id_no:'F227547617',phone:'0980-752-740',emergency:'0919573787',location:'鶯歌區',email:'vicky5131v@gmail.com',inService:false,resigned:false},
+  {id:'14635',name:'汪瑄柔',title:'護理師',level:'N1',edu:'專科',school:'',joinDate:'2015-08-17',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'0938-683-608',emergency:'0936196269',location:'三峽區',email:'a5523268@gmail.com',inService:false,resigned:false},
+  {id:'14958',name:'林昕澄',title:'護理師',level:'N2',edu:'專科',school:'',joinDate:'2017-03-20',licType:'護理師',bls:null,acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'69790',id_no:'H222105611',phone:'0937-810177',emergency:'0916161666',location:'楊梅區',email:'tina810177@gmail.com',inService:false,resigned:false},
+  {id:'15068',name:'高靖緹',title:'護理師',level:'N2',edu:'專科',school:'',joinDate:'2017-08-07',licType:'護理師',bls:'2027-04-22',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'185986',id_no:'F229192683',phone:'0922-669169',emergency:'0989417430',location:'三峽區',email:'connie860118@gmail.com',inService:false,resigned:false},
+  {id:'15268',name:'卓湘晴',title:'護理師',level:'N2',edu:'大學',school:'輔英',joinDate:'2018-07-02',licType:'護理師',bls:'2028-04-21',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'187608',id_no:'F229190170',phone:'0912-866377',emergency:'0937463207',location:'三峽區',email:'dcwshu0715@gmail.com',inService:false,resigned:false},
+  {id:'15321',name:'陳柏宇',title:'護理師',level:'N1',edu:'專科',school:'',joinDate:'2018-08-13',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+  {id:'15349',name:'黃品喆',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'2018-09-03',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+  {id:'15423',name:'周芳怡',title:'護理師',level:'N1',edu:'專科',school:'',joinDate:'2018-12-03',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+  {id:'15508',name:'徐禾沐',title:'護理師',level:'N1',edu:'大學',school:'',joinDate:'2019-06-03',licType:'護理師',bls:null,acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:true,resigned:false},
+  {id:'15544',name:'黃淑嬅',title:'護理師',level:'N1',edu:'專科',school:'',joinDate:'2019-08-05',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+  {id:'15577',name:'鄒芮宸',title:'護理師',level:'N1',edu:'專科',school:'',joinDate:'2019-08-19',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+  {id:'15664',name:'陳金燕',title:'護理師',level:'N1',edu:'專科',school:'',joinDate:'2019-11-18',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+  {id:'15783',name:'蘇奕臻',title:'護理師',level:'N1',edu:'大學',school:'',joinDate:'2020-07-13',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+  {id:'15813',name:'曾雅筠',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'2020-08-17',licType:'護理師',bls:'2027-07-17',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+  {id:'15971',name:'鄧邦偉',title:'助理員',level:'',edu:'',school:'',joinDate:'2021-05-17',licType:'',bls:'2025-04-11',acls:null,als:null,presFirst:'099-0019892',presFirstDate:'2023-11-17',presSmall:'2023200101',presSmallDate:'2026-03-12',nursing_member:'',id_no:'',phone:'0907-732323',emergency:'0926080752',location:'',email:'sangteng351@gmail.com',inService:false,resigned:false},
+  {id:'16016',name:'林峙廷',title:'護理師',level:'N1',edu:'大學',school:'',joinDate:'2021-08-16',licType:'護理師',bls:'2026-07-18',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'',id_no:'',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+  {id:'16304',name:'王婷玉',title:'護理師',level:'N1',edu:'專科',school:'長庚',joinDate:'2022-08-22',licType:'護理師',bls:'2026-07-18',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'215092',id_no:'H225646931',phone:'0979292981',emergency:'0932272909',location:'桃園區',email:'tot23167587@gmail.com',inService:false,resigned:false},
+  {id:'16343',name:'黃玉秀',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'2022-09-19',licType:'護理師',bls:'2026-04-11',acls:null,als:null,presFirst:'099-0022715',presFirstDate:'2025-07-07',presSmall:'1140016748/21205',presSmallDate:'2025-07-07',nursing_member:'215083',id_no:'S225255689',phone:'0903-537526',emergency:'0981640097',location:'三峽區',email:'qa0981640097@gmail.com',inService:false,resigned:false},
+  {id:'16360',name:'辜嬿潔',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'2022-10-17',licType:'護理師',bls:'2027-02-03',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'215032',id_no:'F230320595',phone:'0925-103082',emergency:'0918028234',location:'樹林區',email:'eileen50819tw@gmail.com',inService:false,resigned:false},
+  {id:'16565',name:'黃予婕',title:'護理師',level:'N1',edu:'大學',school:'',joinDate:'2023-08-07',licType:'護理師',bls:'2027-08-20',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'222926',id_no:'F230156675',phone:'0961-521103',emergency:'0927052943',location:'鶯歌區',email:'evaeva30218@gmail.com',inService:false,resigned:false},
+  {id:'16587',name:'黃沂晨',title:'護理師',level:'N1',edu:'專科',school:'',joinDate:'2023-08-21',licType:'護理師',bls:'2027-08-20',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'223086',id_no:'F230914855',phone:'0935-762857',emergency:'0935554687',location:'三峽區',email:'a2126989485@gmail.com',inService:false,resigned:false},
+  {id:'16601',name:'吳婉菁',title:'護理師',level:'N1',edu:'專科',school:'長庚',joinDate:'2023-09-04',licType:'護理師',bls:'2027-09-24',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'222765',id_no:'F231065888',phone:'0901-028720',emergency:'0976757275',location:'鶯歌區',email:'gina0916372799@gmail.com',inService:false,resigned:false},
+  {id:'16650',name:'劉祐呈',title:'護理師',level:'N',edu:'專科',school:'',joinDate:'2023-10-16',licType:'護理師',bls:'2025-11-06',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'222692',id_no:'F131468707',phone:'0906-649056',emergency:'0928840421',location:'住宿113-3/台南',email:'tom32140323@gmail.com',inService:false,resigned:false},
+  {id:'16704',name:'江嘉琪',title:'護理師',level:'N1',edu:'專科',school:'',joinDate:'2024-01-02',licType:'護理師',bls:'2028-04-21',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'223676',id_no:'F230154911',phone:'0903-399656',emergency:'0910345634',location:'鶯歌區',email:'kiki387387@gmail.com',inService:false,resigned:false},
+  {id:'16900',name:'李宜諮',title:'護理師',level:'N1',edu:'大學',school:'',joinDate:'2024-08-05',licType:'護理師',bls:'2026-08-05',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'228099',id_no:'F230849853',phone:'0978935972',emergency:'0918421908',location:'住宿310-2/桃園',email:'Liz910303@gmail.com',inService:false,resigned:false},
+  {id:'16926',name:'何尚謙',title:'護理師',level:'N1',edu:'大學',school:'',joinDate:'2024-08-19',licType:'護理師',bls:'2028-04-21',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'228585',id_no:'F130806981',phone:'0966559285',emergency:'0933135529',location:'土城區',email:'hotommy0227@gmail.com',inService:false,resigned:false},
+  {id:'16946',name:'陳明瑄',title:'護理師',level:'N1',edu:'專科',school:'長庚',joinDate:'2024-09-02',licType:'護理師',bls:null,acls:'2026-11-18',als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'228185',id_no:'F230481075',phone:'0970674370',emergency:'0919328877',location:'三峽區',email:'michelle0970674370@gmail.com',inService:false,resigned:false},
+  {id:'16947',name:'簡晏欣',title:'護理師',level:'N',edu:'專科',school:'長庚',joinDate:'2024-09-02',licType:'護理師',bls:'2027-09-24',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'228685',id_no:'H225989986',phone:'0907137672',emergency:'0981901348',location:'住宿405-1/桃園',email:'ann5720627@gmail.com',inService:false,resigned:false},
+  {id:'16948',name:'黃佩琪',title:'護理師',level:'N1',edu:'專科',school:'長庚',joinDate:'2024-09-02',licType:'護理師',bls:'2028-04-21',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'228102',id_no:'H225937553',phone:'0911229198',emergency:'0907508239',location:'住宿405-3/新竹',email:'mylove01210421@gmail.com',inService:false,resigned:false},
+  {id:'16949',name:'陳筠心',title:'護理師',level:'N',edu:'專科',school:'',joinDate:'2024-09-02',licType:'護理師',bls:'2026-09-02',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'228045',id_no:'F230780322',phone:'0978310595',emergency:'0910967936',location:'鶯歌區',email:'donna70521@gmail.com',inService:false,resigned:false},
+  {id:'17073',name:'張芸甄',title:'護理師',level:'N2',edu:'大學',school:'',joinDate:'2024-12-23',licType:'護理師',bls:'2027-11-03',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'170352',id_no:'C221509450',phone:'0982934578',emergency:'0981594595',location:'住宿505-4',email:'we5566779@yahoo.com.tw',inService:false,resigned:false},
+  {id:'17149',name:'余宗芸',title:'護理師',level:'N',edu:'大學',school:'',joinDate:'2025-04-07',licType:'護理師',bls:'2027-04-07',acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'227001',id_no:'A230981048',phone:'0916510341',emergency:'0975536027',location:'樹林區',email:'anna91042433@gmail.com',inService:false,resigned:false},
+  {id:'17212',name:'陳玥汝',title:'護理師',level:'N2',edu:'專科',school:'',joinDate:'2025-07-21',licType:'護理師',bls:null,acls:null,als:null,presFirst:'099-012852',presFirstDate:'2019-11-21',presSmall:'',presSmallDate:'',nursing_member:'151543',id_no:'F227543020',phone:'0987467879',emergency:'',location:'三峽區',email:'pudding9222000@yahoo.com.tw',inService:false,resigned:false},
+  {id:'17223',name:'鄒昀珊',title:'護理師',level:'N',edu:'專科',school:'',joinDate:'2025-08-11',licType:'護理師',bls:null,acls:'2027-04-13',als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'234421',id_no:'H225919797',phone:'0965038573',emergency:'0931073801',location:'住宿502-3',email:'yunshanzou884@gmail.com',inService:false,resigned:false},
+  {id:'17307',name:'蕭睬容',title:'護理師',level:'N',edu:'大學',school:'',joinDate:'2025-10-07',licType:'護理師',bls:null,acls:null,als:null,presFirst:'',presFirstDate:'',presSmall:'',presSmallDate:'',nursing_member:'234522',id_no:'G222188922',phone:'',emergency:'',location:'',email:'',inService:false,resigned:false},
+];
+
+let resignations = [
+  {id:'EX001',name:'前任護理師甲',title:'護理師',resDate:'2026-01-15'},
+  {id:'EX002',name:'前任護理師乙',title:'護理師',resDate:'2026-02-20'},
+  {id:'EX003',name:'前任護理師丙',title:'護理師',resDate:'2026-03-10'},
+];
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+function calcSen(d){
+  if(!d)return{y:0,m:0,text:'—'};
+  const j=new Date(d),t=TODAY;
+  let y=t.getFullYear()-j.getFullYear(),m=t.getMonth()-j.getMonth();
+  if(m<0){y--;m+=12;}
+  return{y,m,text:`${y}年${m}個月`};
+}
+function calcLeave(d){
+  const{y,m}=calcSen(d);const tot=y*12+m;
+  if(tot<6)return 0;if(tot<18)return 3;if(tot<30)return 7;if(tot<42)return 10;
+  if(tot<54)return 14;if(tot<66)return 15;if(tot<78)return 16;if(tot<90)return 17;
+  if(tot<102)return 18;if(tot<114)return 19;if(tot<126)return 20;if(tot<138)return 21;
+  if(tot<150)return 22;if(tot<162)return 23;if(tot<174)return 24;if(tot<186)return 25;
+  return 30;
+}
+function certSt(d){
+  if(!d)return{s:'none',lbl:'無記錄',cls:'none',days:null};
+  const exp=new Date(d),diff=Math.floor((exp-TODAY)/86400000);
+  if(diff<0)return{s:'exp',lbl:'已過期',cls:'exp',days:diff};
+  if(diff<=90)return{s:'soon',lbl:'即將到期',cls:'soon',days:diff};
+  return{s:'ok',lbl:'有效',cls:'ok',days:diff};
+}
+function boilerSt(dateStr,years=3){
+  if(!dateStr)return{s:'none',lbl:'無資料',cls:'none',expDate:'',days:null};
+  const exp=new Date(dateStr);exp.setFullYear(exp.getFullYear()+years);
+  const diff=Math.floor((exp-TODAY)/86400000);
+  const ds=exp.toISOString().slice(0,10);
+  if(diff<0)return{s:'exp',lbl:'已過期',cls:'exp',expDate:ds,days:diff};
+  if(diff<=180)return{s:'soon',lbl:'即將到期',cls:'soon',expDate:ds,days:diff};
+  return{s:'ok',lbl:'有效',cls:'ok',expDate:ds,days:diff};
+}
+function fd(d){return d?d.replace(/-/g,'/'):' — ';}
+function active(){return staff.filter(s=>!s.resigned);}
+function pct(n,t){return t>0?((n/t)*100).toFixed(0)+'%':'0%';}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function destroyCharts(){Object.values(chartInstances).forEach(c=>{try{c.destroy();}catch(e){}});chartInstances={};}
+
+// ═══════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════
+function toggleSidebar(){
+  const s=document.getElementById('sidebar');
+  const o=document.getElementById('sidebar-overlay');
+  s.classList.toggle('open');
+  o.classList.toggle('open');
+}
+function closeSidebar(){
+  document.getElementById('sidebar')?.classList.remove('open');
+  document.getElementById('sidebar-overlay')?.classList.remove('open');
+}
+
+function nav(n){
+  activeTab=n;
+  document.querySelectorAll('.nav-item').forEach((el,i)=>el.classList.toggle('active',i===n));
+  // sync bottom nav (tabs: 0→bnav0, 1→bnav1, 3→bnav3, 5→bnav5, 6→bnav6)
+  [0,1,3,5,6].forEach(t=>{
+    const el=document.getElementById('bnav'+t);
+    if(el) el.classList.toggle('active',t===n);
+  });
+  closeSidebar();
+  destroyCharts();
+  render();
+}
+function updateBadges(){
+  const as=active();
+  const certKeys=['bls','acls','als'];
+  const alertN=as.reduce((n,s)=>n+certKeys.filter(k=>{const st=certSt(s[k]);return st.s==='exp'||st.s==='soon';}).length,0);
+  const nb3=document.getElementById('nb3');
+  if(nb3){nb3.style.display=alertN?'':'none';nb3.textContent=alertN;}
+  const nbb3=document.getElementById('nbb3');
+  if(nbb3){nbb3.style.display=alertN?'':'none';nbb3.textContent=alertN;}
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDER PAGES
+// ═══════════════════════════════════════════════════════════
+function render(){
+  const el=document.getElementById('main');
+  switch(activeTab){
+    case 0:el.innerHTML=renderHome();break;
+    case 1:el.innerHTML=renderDetail();break;
+    case 2:el.innerHTML=renderContact();break;
+    case 3:el.innerHTML=renderCerts();break;
+    case 4:el.innerHTML=renderBoiler();break;
+    case 5:el.innerHTML=renderStats();setTimeout(drawStatCharts,60);break;
+    case 6:el.innerHTML=renderResign();setTimeout(drawResignChart,60);break;
+  }
+  updateBadges();
+}
+
+// ── PAGE 0: HOME ─────────────────────────────────────────────
+function renderHome(){
+  const as=active();
+  const ast=as.filter(s=>s.title==='助理員');
+  const certs=['bls','acls','als'];
+  const blsOk=as.filter(s=>['ok','soon'].includes(certSt(s.bls).s)).length;
+  const acisOk=as.filter(s=>['ok','soon'].includes(certSt(s.acls).s)).length;
+  const alsOk=as.filter(s=>['ok','soon'].includes(certSt(s.als).s)).length;
+  const anyCertOk=as.filter(s=>['ok','soon'].includes(certSt(s.bls).s)||['ok','soon'].includes(certSt(s.acls).s)||['ok','soon'].includes(certSt(s.als).s)).length;
+  const allCertOk=as.filter(s=>(['ok','soon'].includes(certSt(s.bls).s)||certSt(s.bls).s==='none')&&(['ok','soon'].includes(certSt(s.acls).s)||certSt(s.acls).s==='none')&&(['ok','soon'].includes(certSt(s.als).s)||certSt(s.als).s==='none')&&(certSt(s.bls).s!=='none'||certSt(s.acls).s!=='none'||certSt(s.als).s!=='none')).length;
+  const memberN=as.filter(s=>s.nursing_member).length;
+  const inServN=as.filter(s=>s.inService).length;
+  const presFirstN=as.filter(s=>s.presFirst).length;
+  const presSmallN=as.filter(s=>s.presSmall).length;
+  const totalRes=resignations.length;
+  const resRate=(totalRes/(as.length+totalRes)*100).toFixed(1);
+  const expN=as.reduce((n,s)=>n+certs.filter(k=>certSt(s[k]).s==='exp').length,0);
+  const soonN=as.reduce((n,s)=>n+certs.filter(k=>certSt(s[k]).s==='soon').length,0);
+  const eduMap={'研究所':0,'大學':0,'專科':0};
+  const lvlMap={N4:0,N3:0,N2:0,N1:0,N:0};
+  as.forEach(s=>{
+    const e=s.edu||'';
+    if(e.includes('研究所'))eduMap['研究所']++;
+    else if(e.includes('大學'))eduMap['大學']++;
+    else if(e.includes('專科'))eduMap['專科']++;
+    if(s.level in lvlMap)lvlMap[s.level]++;
+  });
+  const eduColors={'研究所':'#4527a0','大學':'#1565c0','專科':'#00695c'};
+  const lvlColors={N4:'#4527a0',N3:'#1565c0',N2:'#00695c',N1:'#e65100',N:'#546e7a'};
+
+  return`
+  <div class="page-title">首頁總覽</div>
+  <div class="page-sub">恩主公醫院 手術室 · 資料日期：${fd(TODAY.toISOString().slice(0,10))}</div>
+  ${expN>0?`<div class="alert alert-danger">⚠️ <strong>${expN} 筆</strong>急救證照已過期，請立即安排複訓！</div>`:''}
+  ${soonN>0?`<div class="alert alert-warn">🔔 <strong>${soonN} 筆</strong>急救證照將於 90 天內到期，請盡早安排。</div>`:''}
+  <div class="kpi-row">
+    <div class="kpi blue"><div class="kpi-label">👥 在職人數</div><div class="kpi-val">${as.length}</div><div class="kpi-sub">含助理員 ${ast.length} 人</div></div>
+    <div class="kpi green"><div class="kpi-label">💓 急救證照有效人數</div><div class="kpi-val">${anyCertOk}</div><div class="kpi-sub">BLS ${blsOk} · ACLS ${acisOk} · ALS ${alsOk}<br>有證照佔比 ${pct(anyCertOk,as.length)}</div></div>
+    <div class="kpi teal"><div class="kpi-label">🔧 壓力鍋人員</div><div class="kpi-val">${presFirstN}</div><div class="kpi-sub">小型鍋爐 ${presSmallN} 人</div></div>
+    <div class="kpi orange"><div class="kpi-label">📤 年度離職</div><div class="kpi-val">${totalRes}</div><div class="kpi-sub">離職率 ${resRate}%</div></div>
+    <div class="kpi purple"><div class="kpi-label">🎓 在職進修</div><div class="kpi-val">${inServN}</div><div class="kpi-sub">人</div></div>
+    <div class="kpi green"><div class="kpi-label">🏥 護理學會</div><div class="kpi-val">${memberN}</div><div class="kpi-sub">佔比 ${pct(memberN,as.length)}</div></div>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">📚 學歷分布</div></div>
+      <div class="card-body">
+        ${Object.entries(eduMap).map(([k,v])=>{const p=as.length>0?Math.round(v/as.length*100):0;return`<div class="bar-row"><span class="bar-lbl">${k}</span><div class="bar-track"><div class="bar-fill" style="width:${p}%;background:${eduColors[k]}">${p>10?p+'%':''}</div></div><span class="bar-n">${v}</span></div>`;}).join('')}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">🏆 進階職級分布</div></div>
+      <div class="card-body">
+        ${Object.entries(lvlMap).map(([k,v])=>{const p=as.length>0?Math.round(v/as.length*100):0;return`<div class="bar-row"><span class="bar-lbl">${k}</span><div class="bar-track"><div class="bar-fill" style="width:${p}%;background:${lvlColors[k]}">${p>10?p+'%':''}</div></div><span class="bar-n">${v}</span></div>`;}).join('')}
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">🚑 急救證照狀態一覽</div></div>
+    <div class="card-body">
+      <div class="grid3">
+        ${['BLS','ACLS','ALS'].map(cert=>{
+          const key=cert.toLowerCase();const ys=cert==='ACLS'?3:2;
+          const ok=as.filter(s=>certSt(s[key]).s==='ok').length;
+          const soon=as.filter(s=>certSt(s[key]).s==='soon').length;
+          const exp=as.filter(s=>certSt(s[key]).s==='exp').length;
+          const none=as.filter(s=>certSt(s[key]).s==='none').length;
+          return`<div>
+            <div style="font-weight:600;margin-bottom:10px;font-size:13px">${cert} <span style="font-size:11px;color:#90a4ae;font-weight:400">(${ys}年更新)</span></div>
+            <div style="display:flex;flex-direction:column;gap:5px">
+              ${[['✅ 有效',ok,'#e8f5e9','#2e7d32'],['⚠️ 即將到期',soon,'#fff3e0','#e65100'],['❌ 已過期',exp,'#ffebee','#c62828'],['— 無記錄',none,'#eceff1','#546e7a']].map(([l,n,bg,fg])=>`
+              <div style="display:flex;justify-content:space-between;padding:5px 9px;background:${bg};border-radius:6px;font-size:12px;color:${fg};font-weight:${n>0?600:400}"><span>${l}</span><span>${n}</span></div>`).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">👩‍⚕️ 各職稱人數</div></div>
+    <div class="card-body" style="display:flex;flex-wrap:wrap;gap:10px">
+      ${TITLE_ORDER.map(t=>{const c=as.filter(s=>s.title===t).length;if(!c)return'';return`<div class="stat-box"><div class="stat-box-val" style="color:#1565c0">${c}</div><div class="stat-box-lbl">${t}</div></div>`;}).join('')}
+    </div>
+  </div>`;
+}
+
+// ── PAGE 1: DETAIL ────────────────────────────────────────────
+function renderDetail(){
+  const as=active();
+  const qs=document.getElementById('ds')?.value||'';
+  const tf=document.getElementById('dt')?.value||'all';
+  const lf=document.getElementById('dl')?.value||'all';
+  let rows=as.filter(s=>{
+    const mq=!qs||s.name.includes(qs)||s.id.includes(qs);
+    const mt=tf==='all'||s.title===tf;
+    const ml=lf==='all'||s.level===lf;
+    return mq&&mt&&ml;
+  });
+  const isMobile=window.innerWidth<=680;
+  return`
+  <div class="page-title">人員明細總表</div>
+  <div class="page-sub">共 ${rows.length} 筆記錄</div>
+  <div class="toolbar">
+    <input type="text" id="ds" placeholder="🔍 搜尋姓名 / 員編..." oninput="render()" value="${esc(qs)}">
+    <select id="dt" onchange="render()">
+      <option value="all">全部職稱</option>
+      ${TITLE_ORDER.map(t=>`<option value="${t}"${tf===t?' selected':''}>${t}</option>`).join('')}
+    </select>
+    <select id="dl" onchange="render()">
+      <option value="all">全部等級</option>
+      ${['N4','N3','N2','N1','N'].map(l=>`<option value="${l}"${lf===l?' selected':''}>${l}</option>`).join('')}
+    </select>
+    <div class="toolbar-right">
+      <button class="btn btn-success" onclick="exportCSV('staff')">⬇ 匯出</button>
+      <button class="btn btn-primary" onclick="openAddFlow()">＋ 新增</button>
+    </div>
+  </div>
+  ${isMobile ? rows.map(s=>{
+    const sen=calcSen(s.joinDate),lv=calcLeave(s.joinDate);
+    const b=certSt(s.bls),a=certSt(s.acls),al=certSt(s.als);
+    return`<div class="card" style="margin-bottom:10px">
+      <div style="padding:12px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #f0f2f5">
+        <div>
+          <div style="font-weight:700;font-size:15px">${s.name}</div>
+          <div style="font-size:11px;color:#90a4ae;margin-top:1px">${s.id} · ${s.title} <span class="badge b-blue" style="margin-left:4px">${s.level||'—'}</span></div>
+        </div>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-outline btn-sm" onclick="openEdit('${s.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="markResign('${s.id}')">離</button>
+        </div>
+      </div>
+      <div style="padding:10px 14px;display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px">
+        <div><span style="color:#90a4ae">年資</span><br><strong>${sen.text}</strong></div>
+        <div><span style="color:#90a4ae">特休</span><br><strong>${lv} 天</strong></div>
+        <div><span style="color:#90a4ae">學歷</span><br>${s.edu||'—'}</div>
+        <div><span style="color:#90a4ae">執照</span><br>${s.licType||'—'}</div>
+        <div><span style="color:#90a4ae">BLS</span><br><span class="badge ${b.cls}">${b.lbl}</span>${b.days!==null&&b.days>=0?` <span style="color:#90a4ae;font-size:10px">${b.days}天</span>`:''}</div>
+        <div><span style="color:#90a4ae">ACLS</span><br><span class="badge ${a.cls}">${a.lbl}</span></div>
+        <div style="grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding-top:4px;border-top:1px solid #f0f2f5;margin-top:2px">
+          <span style="color:#90a4ae">在職進修</span>
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer">
+            <span style="font-size:12px;color:${s.inService?'#00695c':'#90a4ae'};font-weight:${s.inService?600:400}">${s.inService?'進修中':'未進修'}</span>
+            <div onclick="toggleInService('${s.id}')" style="width:40px;height:22px;border-radius:11px;background:${s.inService?'#00695c':'#cfd8dc'};position:relative;cursor:pointer;transition:background .2s;flex-shrink:0">
+              <div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${s.inService?'20px':'2px'};transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>`;
+  }).join('') : `<div class="card"><div class="tbl-wrap">
+  <table>
+    <thead><tr><th>員編</th><th>姓名</th><th>職稱</th><th>等級</th><th>年資</th><th>到職日</th><th>特休</th><th>BLS</th><th>ACLS</th><th>ALS</th><th>執照</th><th>學歷</th><th>在職進修</th><th>操作</th></tr></thead>
+    <tbody>
+    ${rows.map(s=>{
+      const sen=calcSen(s.joinDate),lv=calcLeave(s.joinDate);
+      const b=certSt(s.bls),a=certSt(s.acls),al=certSt(s.als);
+      return`<tr>
+        <td class="td-muted">${s.id}</td>
+        <td><strong>${s.name}</strong></td>
+        <td>${s.title}</td>
+        <td><span class="badge b-blue">${s.level||'—'}</span></td>
+        <td style="white-space:nowrap">${sen.text}</td>
+        <td class="td-muted" style="white-space:nowrap">${fd(s.joinDate)}</td>
+        <td style="text-align:center;font-weight:600">${lv}</td>
+        <td><span class="badge ${b.cls}">${b.lbl}</span>${b.days!==null&&b.days>=0?`<div style="font-size:10px;color:#90a4ae;margin-top:2px">${b.days}天</div>`:''}</td>
+        <td><span class="badge ${a.cls}">${a.lbl}</span>${a.days!==null&&a.days>=0?`<div style="font-size:10px;color:#90a4ae;margin-top:2px">${a.days}天</div>`:''}</td>
+        <td><span class="badge ${al.cls}">${al.lbl}</span></td>
+        <td>${s.licType||'—'}</td>
+        <td>${s.edu||'—'}</td>
+        <td style="text-align:center">
+          <div onclick="toggleInService('${s.id}')" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer">
+            <div style="width:36px;height:20px;border-radius:10px;background:${s.inService?'#00695c':'#cfd8dc'};position:relative;transition:background .2s;flex-shrink:0">
+              <div style="width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:2px;left:${s.inService?'18px':'2px'};transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)"></div>
+            </div>
+            <span style="font-size:11px;color:${s.inService?'#00695c':'#90a4ae'};font-weight:${s.inService?600:400}">${s.inService?'進修中':'—'}</span>
+          </div>
+        </td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-outline btn-sm" onclick="openEdit('${s.id}')">✏️ 編輯</button>
+          <button class="btn btn-danger btn-sm" onclick="markResign('${s.id}')" style="margin-left:4px">離職</button>
+        </td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>
+  </div></div>`}`;
+}
+
+// ── PAGE 2: CONTACT ───────────────────────────────────────────
+function renderContact(){
+  if(!contactUnlocked){
+    return`<div class="lock-screen">
+      <div class="lock-card">
+        <div class="lock-icon">🔒</div>
+        <div class="lock-title">人員通訊表</div>
+        <div class="lock-sub">此頁面含個人隱私資料<br>請輸入密碼解鎖</div>
+        <input type="password" class="lock-input" id="cpinput" placeholder="••••" onkeydown="if(event.key==='Enter')checkContactPin()">
+        <div class="lock-err" id="cpinerr"></div>
+        <button class="btn btn-primary" onclick="checkContactPin()" style="width:100%;justify-content:center">解鎖</button>
+      </div>
+    </div>`;
+  }
+  const as=active();
+  const qs=document.getElementById('cs')?.value||'';
+  const rows=as.filter(s=>!qs||s.name.includes(qs)||s.id.includes(qs));
+  return`
+  <div class="page-title">人員通訊表</div>
+  <div class="page-sub">含個人隱私資料，請妥善保管 · 共 ${rows.length} 筆</div>
+  <div class="toolbar">
+    <input type="text" id="cs" placeholder="🔍 搜尋姓名 / 員編..." oninput="render()" value="${esc(qs)}">
+    <div class="toolbar-right">
+      <button class="btn btn-success" onclick="exportCSV('contact')">⬇ 匯出 CSV</button>
+      <button class="btn btn-outline" onclick="contactUnlocked=false;render()">🔒 鎖定</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>員編</th><th>姓名</th><th>職稱</th><th>身分證</th><th>護理學會號</th><th>信箱</th><th>手機</th><th>緊急聯絡</th><th>住所動向</th><th>操作</th></tr></thead>
+      <tbody>
+      ${rows.map(s=>`<tr>
+        <td class="td-muted">${s.id}</td>
+        <td><strong>${s.name}</strong></td>
+        <td>${s.title}</td>
+        <td style="font-family:monospace;font-size:11px">${s.id_no||'—'}</td>
+        <td class="td-muted">${s.nursing_member||'—'}</td>
+        <td class="td-muted" style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.email||'—'}</td>
+        <td style="white-space:nowrap">${s.phone||'—'}</td>
+        <td class="td-muted" style="white-space:nowrap">${s.emergency||'—'}</td>
+        <td class="td-muted">${s.location||'—'}</td>
+        <td><button class="btn btn-outline btn-sm" onclick="openEditContact('${s.id}')">✏️ 編輯</button></td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+  </div>`;
+}
+
+// ── PAGE 3: CERTS ─────────────────────────────────────────────
+function renderCerts(){
+  const as=active();
+  const certDefs=[{key:'bls',lbl:'BLS',yrs:2},{key:'acls',lbl:'ACLS',yrs:3},{key:'als',lbl:'ALS',yrs:2}];
+  const sf=document.getElementById('cf')?.value||'all';
+  const ct=document.getElementById('ct')?.value||'all';
+  const expN=as.reduce((n,s)=>n+certDefs.filter(c=>certSt(s[c.key]).s==='exp').length,0);
+  const soonN=as.reduce((n,s)=>n+certDefs.filter(c=>certSt(s[c.key]).s==='soon').length,0);
+  let rows=[];
+  as.forEach(s=>certDefs.forEach(cd=>{
+    if(ct!=='all'&&cd.lbl!==ct)return;
+    const st=certSt(s[cd.key]);
+    if(sf==='all'||st.s===sf)rows.push({s,cd,st});
+  }));
+  rows.sort((a,b)=>(a.st.days??99999)-(b.st.days??99999));
+  return`
+  <div class="page-title">急救證照管理</div>
+  <div class="page-sub">BLS (2年) · ACLS (3年) · ALS (2年)</div>
+  ${expN>0?`<div class="alert alert-danger">⚠️ ${expN} 筆已過期，請立即複訓！</div>`:''}
+  ${soonN>0?`<div class="alert alert-warn">🔔 ${soonN} 筆 90 天內到期</div>`:''}
+  <div class="toolbar">
+    <select id="ct" onchange="render()">
+      <option value="all">全部證照</option>
+      <option value="BLS">BLS (2年)</option>
+      <option value="ACLS">ACLS (3年)</option>
+      <option value="ALS">ALS (2年)</option>
+    </select>
+    <select id="cf" onchange="render()">
+      <option value="all">全部狀態</option>
+      <option value="ok">✅ 有效</option>
+      <option value="soon">⚠️ 即將到期</option>
+      <option value="exp">❌ 已過期</option>
+      <option value="none">— 無記錄</option>
+    </select>
+    <div class="toolbar-right">
+      <button class="btn btn-success" onclick="exportCSV('cert')">⬇ 匯出</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>員編</th><th>姓名</th><th>職稱</th><th>證照</th><th>到期日</th><th>狀態</th><th>剩餘天數</th><th>效期進度</th></tr></thead>
+      <tbody>
+      ${rows.map(({s,cd,st})=>{
+        const totalDays=cd.yrs*365;
+        const pctLeft=st.days!==null&&st.days>=0?Math.min(100,Math.round(st.days/totalDays*100)):0;
+        const pgcls=st.s==='ok'?'prog-ok':st.s==='soon'?'prog-soon':'prog-exp';
+        return`<tr>
+          <td class="td-muted">${s.id}</td>
+          <td><strong>${s.name}</strong></td>
+          <td>${s.title}</td>
+          <td><span class="badge b-purple">${cd.lbl}</span></td>
+          <td class="td-muted">${fd(s[cd.key])}</td>
+          <td><span class="badge ${st.cls}">${st.lbl}</span></td>
+          <td style="text-align:center;font-weight:${st.days!==null&&st.days<=30?700:400};color:${st.days!==null&&st.days<=30?'#c62828':'inherit'}">${st.days!==null?st.days+'天':'—'}</td>
+          <td style="min-width:80px">${st.days!==null&&st.days>=0?`<div class="prog-wrap"><div class="prog-fill ${pgcls}" style="width:${pctLeft}%"></div></div><div style="font-size:10px;color:#90a4ae;margin-top:2px">${pctLeft}%</div>`:'—'}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+    </div>
+  </div>`;
+}
+
+// ── PAGE 4: BOILER ────────────────────────────────────────────
+function renderBoiler(){
+  const as=active();
+  const firstList=as.filter(s=>s.presFirst);
+  const smallList=as.filter(s=>s.presSmall);
+  function tbl(list,key,dkey,label){
+    return`<div class="card" style="margin-bottom:16px">
+      <div class="card-header"><div class="card-title">🔧 ${label} (${list.length} 人)</div></div>
+      <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>姓名</th><th>職稱</th><th>證書號</th><th>發照日期</th><th>效期至</th><th>狀態</th><th>剩餘天數</th><th>效期進度</th></tr></thead>
+        <tbody>
+        ${list.map(s=>{
+          const st=boilerSt(s[dkey],3);
+          const p=st.days!==null&&st.days>=0?Math.min(100,Math.round(st.days/(3*365)*100)):0;
+          const pgcls=st.s==='ok'?'prog-ok':st.s==='soon'?'prog-soon':'prog-exp';
+          return`<tr>
+            <td><strong>${s.name}</strong></td>
+            <td>${s.title}</td>
+            <td style="font-family:monospace;font-size:11px">${s[key]}</td>
+            <td class="td-muted">${fd(s[dkey])}</td>
+            <td class="td-muted">${st.expDate?fd(st.expDate):'—'}</td>
+            <td><span class="badge ${st.cls}">${st.lbl}</span></td>
+            <td style="text-align:center">${st.days!==null?st.days+'天':'—'}</td>
+            <td style="min-width:80px">${st.days!==null&&st.days>=0?`<div class="prog-wrap"><div class="prog-fill ${pgcls}" style="width:${p}%"></div></div><div style="font-size:10px;color:#90a4ae;margin-top:2px">${p}%</div>`:'—'}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+      </div>
+    </div>`;
+  }
+  return`
+  <div class="page-title">壓力鍋技術士</div>
+  <div class="page-sub">效期依發照日期自動計算，在職訓練週期 3 年</div>
+  <div class="alert alert-warn">📌 效期到期前請安排 3 年在職訓練，完成後更新發照日期以重新計算效期</div>
+  ${tbl(firstList,'presFirst','presFirstDate','第一種壓力容器')}
+  ${tbl(smallList,'presSmall','presSmallDate','小型鍋爐')}`;
+}
+
+// ── PAGE 5: STATS ─────────────────────────────────────────────
+function renderStats(){
+  const tabs=['執照別分布','學歷分布','年資分布','進階職級分布','急救證照分布'];
+  return`
+  <div class="page-title">統計分析</div>
+  <div class="page-sub">在職護理人員各項統計（不含助理員）</div>
+  <div class="inner-tabs">
+    ${tabs.map((t,i)=>`<div class="itab${statsSubTab===i?' active':''}" onclick="statsSubTab=${i};destroyCharts();render()">${t}</div>`).join('')}
+  </div>
+  <div id="stats-body">${renderStatsBody()}</div>`;
+}
+function renderStatsBody(){
+  const as=active().filter(s=>s.title!=='助理員');
+  const titles=['護理長','副護理長','組長','護理師','護士'];
+  let cats,dataFn;
+  if(statsSubTab===0){
+    cats=['護理師','護士'];
+    dataFn=(cat,t)=>as.filter(s=>s.title===t&&s.licType===cat).length;
+  }else if(statsSubTab===1){
+    cats=['研究所','大學','專科'];
+    dataFn=(cat,t)=>as.filter(s=>s.title===t&&(s.edu||'').includes(cat)).length;
+  }else if(statsSubTab===2){
+    cats=['1年以下','1-2年','2-5年','5-10年','10-15年','15-20年','20-25年','25年以上'];
+    dataFn=(cat,t)=>as.filter(s=>{
+      if(s.title!==t)return false;
+      const y=calcSen(s.joinDate).y;
+      if(cat==='1年以下')return y<1;if(cat==='1-2年')return y>=1&&y<2;
+      if(cat==='2-5年')return y>=2&&y<5;if(cat==='5-10年')return y>=5&&y<10;
+      if(cat==='10-15年')return y>=10&&y<15;if(cat==='15-20年')return y>=15&&y<20;
+      if(cat==='20-25年')return y>=20&&y<25;if(cat==='25年以上')return y>=25;
+      return false;
+    }).length;
+  }else if(statsSubTab===3){
+    cats=['N4','N3','N2','N1','N'];
+    dataFn=(cat,t)=>as.filter(s=>s.title===t&&s.level===cat).length;
+  }else{
+    cats=['BLS','ACLS','ALS'];
+    dataFn=(cat,t)=>as.filter(s=>s.title===t&&certSt(s[cat.toLowerCase()]).s==='ok').length;
+  }
+  const rowTotals=cats.map(c=>titles.reduce((n,t)=>n+dataFn(c,t),0));
+  const grand=rowTotals.reduce((a,b)=>a+b,0);
+  const colors=['#1565c0','#4527a0','#00695c','#e65100','#546e7a','#c62828','#6a1b9a','#00838f'];
+  return`
+  <div class="card">
+    <div class="card-body">
+      <div class="tbl-wrap" style="margin-bottom:20px">
+      <table>
+        <thead><tr><th>項目</th>${titles.map(t=>`<th>${t}</th>`).join('')}<th>合計</th><th>佔比</th></tr></thead>
+        <tbody>
+        ${cats.map((cat,ci)=>{
+          const tot=rowTotals[ci];
+          const p=grand>0?((tot/grand)*100).toFixed(1):0;
+          return`<tr>
+            <td><span class="badge b-blue">${cat}</span></td>
+            ${titles.map(t=>`<td style="text-align:center">${dataFn(cat,t)||'—'}</td>`).join('')}
+            <td style="text-align:center;font-weight:700">${tot}</td>
+            <td style="text-align:center;color:#1565c0;font-weight:600">${p}%</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+        ${cats.map((c,i)=>`<span style="display:flex;align-items:center;gap:5px;font-size:12px;color:#546e7a"><span style="width:12px;height:12px;border-radius:3px;background:${colors[i%colors.length]}"></span>${c}</span>`).join('')}
+      </div>
+      <div style="position:relative;height:${Math.max(200,cats.length*38+60)}px">
+        <canvas id="statsChart" role="img" aria-label="統計分析圖表"></canvas>
+      </div>
+    </div>
+  </div>`;
+}
+function drawStatCharts(){
+  const canvas=document.getElementById('statsChart');
+  if(!canvas||!window.Chart)return;
+  const as=active().filter(s=>s.title!=='助理員');
+  const titles=['護理長','副護理長','組長','護理師','護士'];
+  let cats,dataFn;
+  if(statsSubTab===0){cats=['護理師','護士'];dataFn=(c,t)=>as.filter(s=>s.title===t&&s.licType===c).length;}
+  else if(statsSubTab===1){cats=['研究所','大學','專科'];dataFn=(c,t)=>as.filter(s=>s.title===t&&(s.edu||'').includes(c)).length;}
+  else if(statsSubTab===2){
+    cats=['1年以下','1-2年','2-5年','5-10年','10-15年','15-20年','20-25年','25年以上'];
+    dataFn=(cat,t)=>as.filter(s=>{
+      if(s.title!==t)return false;const y=calcSen(s.joinDate).y;
+      if(cat==='1年以下')return y<1;if(cat==='1-2年')return y>=1&&y<2;
+      if(cat==='2-5年')return y>=2&&y<5;if(cat==='5-10年')return y>=5&&y<10;
+      if(cat==='10-15年')return y>=10&&y<15;if(cat==='15-20年')return y>=15&&y<20;
+      if(cat==='20-25年')return y>=20&&y<25;if(cat==='25年以上')return y>=25;return false;
+    }).length;
+  }else if(statsSubTab===3){cats=['N4','N3','N2','N1','N'];dataFn=(c,t)=>as.filter(s=>s.title===t&&s.level===c).length;}
+  else{cats=['BLS','ACLS','ALS'];dataFn=(c,t)=>as.filter(s=>s.title===t&&certSt(s[c.toLowerCase()]).s==='ok').length;}
+  const colors=['#1565c0','#4527a0','#00695c','#e65100','#546e7a','#c62828','#6a1b9a','#00838f'];
+  try{
+    chartInstances['stats']=new Chart(canvas,{
+      type:'bar',
+      data:{labels:titles,datasets:cats.map((cat,i)=>({label:cat,data:titles.map(t=>dataFn(cat,t)),backgroundColor:colors[i%colors.length]+'CC',borderColor:colors[i%colors.length],borderWidth:1}))},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,ticks:{stepSize:1}}}}
+    });
+  }catch(e){}
+}
+
+// ── PAGE 6: RESIGN ────────────────────────────────────────────
+function resignCalc(yr){
+  const as=active();
+  // 分母 = 各月在職人數：期初在職 + 當月新進（joinDate 在該月）
+  // 分子 = 各月離職人數
+  // 期間實際護理人數 = 在職人數（當月底） = 上月底在職 + 當月新進 - 當月離職
+  // 簡化：分母為 年初在職人數 + 當月前已到職人數（累計）
+  const allStaff = staff; // 含離職
+  const monthly = Array.from({length:12},(_,i)=>{
+    const resCount = resignations.filter(r=>{const d=new Date(r.resDate);return d.getFullYear()===yr&&d.getMonth()===i;}).length;
+    // 期間內實際護理人數 = 當月有在職記錄的人數（到職日 <= 月底，且離職日 > 月初 or 未離職）
+    const mStart = new Date(yr,i,1);
+    const mEnd   = new Date(yr,i+1,0);
+    const denom = allStaff.filter(s=>{
+      if(!s.joinDate) return false;
+      const j=new Date(s.joinDate);
+      if(j>mEnd) return false; // 尚未到職
+      if(s.resigned){
+        const rr=resignations.find(r=>r.id===s.id);
+        if(rr){const rd=new Date(rr.resDate);if(rd<mStart)return false;} // 月初前已離職
+      }
+      return true;
+    }).length;
+    return {res:resCount, denom};
+  });
+  let cumRes=0;
+  const rows = monthly.map((m,i)=>{
+    cumRes+=m.res;
+    const monthRate = m.denom>0 ? (m.res/m.denom*100).toFixed(2) : '0.00';
+    const cumRate   = m.denom>0 ? (cumRes/m.denom*100).toFixed(2) : '0.00';
+    return {...m, cumRes, monthRate, cumRate};
+  });
+  return rows;
+}
+
+function renderResign(){
+  const as=active();
+  const yr=2026;
+  const mnthLabels=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const rows=resignCalc(yr);
+  const totalRes=resignations.filter(r=>new Date(r.resDate).getFullYear()===yr).length;
+  const lastActiveMonth=rows.reduce((last,r,i)=>r.res>0||i<=TODAY.getMonth()?i:last, TODAY.getMonth());
+  const cumRateNow=rows[lastActiveMonth]?.cumRate||'0.00';
+
+  return`
+  <div class="page-title">離職率分析</div>
+  <div class="page-sub">${yr} 年度 &nbsp;·&nbsp; 分子（離職人數）÷ 分母（期間內實際護理人數）</div>
+  <div class="kpi-row">
+    <div class="kpi red"><div class="kpi-label">📤 年度離職人數</div><div class="kpi-val">${totalRes}</div><div class="kpi-sub">分子合計</div></div>
+    <div class="kpi blue"><div class="kpi-label">👥 目前在職</div><div class="kpi-val">${as.length}</div><div class="kpi-sub">人（分母基數）</div></div>
+    <div class="kpi orange"><div class="kpi-label">📊 累計離職率</div><div class="kpi-val">${cumRateNow}%</div><div class="kpi-sub">截至 ${mnthLabels[lastActiveMonth]}</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">📋 每月離職人數 ＆ 離職率明細（${yr}年）</div></div>
+    <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>月份</th>
+          <th style="text-align:center">分母<br><span style="font-weight:400;font-size:10px">期間在職人數</span></th>
+          <th style="text-align:center">分子<br><span style="font-weight:400;font-size:10px">當月離職人數</span></th>
+          <th style="text-align:center">當月離職率</th>
+          <th style="text-align:center">累計離職人數</th>
+          <th style="text-align:center">累計離職率</th>
+          <th>離職人員</th>
+        </tr>
+      </thead>
+      <tbody>
+      ${rows.map((r,i)=>{
+        const names=resignations.filter(res=>{const d=new Date(res.resDate);return d.getFullYear()===yr&&d.getMonth()===i;}).map(res=>res.name).join('、');
+        const isFuture=i>TODAY.getMonth();
+        const rateColor=parseFloat(r.monthRate)>=5?'#c62828':parseFloat(r.monthRate)>=2?'#e65100':'#2e7d32';
+        return`<tr style="${isFuture?'opacity:0.4':''}">
+          <td style="font-weight:600">${mnthLabels[i]}</td>
+          <td style="text-align:center">${r.denom}</td>
+          <td style="text-align:center">
+            ${r.res>0?`<span style="background:#ffebee;color:#c62828;padding:2px 8px;border-radius:12px;font-weight:700">${r.res}</span>`:'<span style="color:#b0bec5">0</span>'}
+          </td>
+          <td style="text-align:center;font-weight:${r.res>0?700:400};color:${r.res>0?rateColor:'#b0bec5'}">${r.res>0?r.monthRate+'%':'—'}</td>
+          <td style="text-align:center;font-weight:600">${r.cumRes}</td>
+          <td style="text-align:center">
+            <span style="color:${parseFloat(r.cumRate)>=5?'#c62828':parseFloat(r.cumRate)>=2?'#e65100':'#2e7d32'};font-weight:600">${r.cumRate}%</span>
+          </td>
+          <td style="font-size:11px;color:#546e7a">${names||'—'}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:#f5f7fa;font-weight:700">
+          <td>合計</td>
+          <td style="text-align:center">—</td>
+          <td style="text-align:center">${totalRes}</td>
+          <td style="text-align:center">—</td>
+          <td style="text-align:center">${totalRes}</td>
+          <td style="text-align:center;color:#1565c0">${cumRateNow}%</td>
+          <td></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><div class="card-title">📊 當月離職率 ＆ 累計離職率（${yr}年）</div></div>
+    <div class="card-body" style="position:relative;height:240px">
+      <canvas id="resignChart" role="img" aria-label="月度離職分析圖"></canvas>
+    </div>
+    <div style="display:flex;gap:16px;padding:0 16px 14px;font-size:12px;color:#546e7a">
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;border-radius:3px;background:#ffcdd2;border:1px solid #c62828"></span>當月離職人數</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:24px;height:3px;background:#c62828;border-radius:2px"></span>當月離職率 (%)</span>
+      <span style="display:flex;align-items:center;gap:5px"><span style="width:24px;height:3px;background:#1565c0;border-radius:2px;border-top:2px dashed #1565c0"></span>累計離職率 (%)</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📋 離職記錄</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-success btn-sm" onclick="exportCSV('resign')">⬇ 匯出</button>
+        <button class="btn btn-primary btn-sm" onclick="openAddResign()">＋ 新增</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>員編</th><th>姓名</th><th>職稱</th><th>離職日期</th><th>備註</th><th>操作</th></tr></thead>
+      <tbody>
+      ${resignations.map((r,idx)=>`<tr>
+        <td class="td-muted">${r.id}</td>
+        <td><strong>${r.name}</strong></td>
+        <td>${r.title}</td>
+        <td>${fd(r.resDate)}</td>
+        <td class="td-muted">${r.note||'—'}</td>
+        <td style="white-space:nowrap">
+          <button class="btn btn-outline btn-sm" onclick="openEditResign(${idx})">✏️ 編輯</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteResign(${idx})" style="margin-left:4px">🗑 刪除</button>
+        </td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    </div>
+  </div>`;
+}
+
+function drawResignChart(){
+  const canvas=document.getElementById('resignChart');
+  if(!canvas||!window.Chart)return;
+  const yr=2026;
+  const mnths=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const rows=resignCalc(yr);
+  const monthly=rows.map(r=>r.res);
+  const monthRates=rows.map(r=>parseFloat(r.monthRate));
+  const cumRates=rows.map(r=>parseFloat(r.cumRate));
+  try{
+    chartInstances['resign']=new Chart(canvas,{
+      type:'bar',
+      data:{
+        labels:mnths,
+        datasets:[
+          {type:'bar',label:'離職人數',data:monthly,backgroundColor:'#ffcdd2',borderColor:'#c62828',borderWidth:1,yAxisID:'y',order:3},
+          {type:'line',label:'當月離職率(%)',data:monthRates,borderColor:'#c62828',backgroundColor:'transparent',borderWidth:2,pointRadius:4,pointBackgroundColor:'#c62828',borderDash:[4,3],yAxisID:'y2',order:2},
+          {type:'line',label:'累計離職率(%)',data:cumRates,borderColor:'#1565c0',backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,pointBackgroundColor:'#1565c0',yAxisID:'y2',order:1}
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
+          if(ctx.dataset.label==='離職人數')return` 離職人數：${ctx.parsed.y} 人`;
+          return` ${ctx.dataset.label}：${ctx.parsed.y}%`;
+        }}}},
+        scales:{
+          y:{beginAtZero:true,ticks:{stepSize:1,callback:v=>v+'人'},grid:{color:'#f0f2f5'},title:{display:true,text:'人數',font:{size:11},color:'#90a4ae'}},
+          y2:{position:'right',beginAtZero:true,ticks:{callback:v=>v+'%'},grid:{display:false},title:{display:true,text:'離職率',font:{size:11},color:'#90a4ae'}}
+        }
+      }
+    });
+  }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════════════════════════
+function showModal(html){
+  document.getElementById('modal-area')?.remove();
+  const el=document.createElement('div');el.id='modal-area';el.className='overlay';
+  el.innerHTML=`<div class="modal"><div class="modal-handle"></div>${html}</div>`;
+  el.addEventListener('click',e=>{if(e.target===el)closeModal();});
+  document.body.appendChild(el);
+  // prevent body scroll on mobile when modal open
+  document.body.style.overflow='hidden';
+}
+function closeModal(){
+  document.getElementById('modal-area')?.remove();
+  document.body.style.overflow='';
+}
+
+function openAddFlow(){
+  showModal(`<div class="modal-title">🔒 新增人員 — 請輸入密碼</div>
+    <div class="form-field"><label>管理員密碼</label>
+    <input type="password" id="apinput" placeholder="請輸入密碼" style="text-align:center;letter-spacing:6px;font-size:18px" onkeydown="if(event.key==='Enter')verifyAddPin()"></div>
+    <div style="color:#c62828;font-size:12px;min-height:18px;margin-top:4px" id="apinerr"></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="verifyAddPin()">確認</button></div>`);
+}
+function verifyAddPin(){
+  if(document.getElementById('apinput')?.value===ADD_PIN){closeModal();showStaffForm(null);}
+  else{const e=document.getElementById('apinerr');if(e)e.textContent='密碼錯誤，請再試一次';}
+}
+function openEdit(id){showStaffForm(staff.find(s=>s.id===id));}
+
+function showStaffForm(d){
+  const isEdit=!!d;
+  const sel=(id,opts,val)=>`<select id="${id}">${opts.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}</select>`;
+  showModal(`<div class="modal-title">${isEdit?'✏️ 編輯人員':'➕ 新增人員'}</div>
+    <div class="form-section">基本資料</div>
+    <div class="form-grid">
+      <div class="form-field"><label>員編</label><input type="text" id="fid" value="${d?.id||''}"></div>
+      <div class="form-field"><label>姓名 *</label><input type="text" id="fname" value="${d?.name||''}"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>職稱</label>${sel('ftitle',TITLE_ORDER,d?.title)}</div>
+      <div class="form-field"><label>進階等級</label>${sel('flevel',['','N4','N3','N2','N1','N'],d?.level)}</div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>到職日 *</label><input type="date" id="fjoin" value="${d?.joinDate||''}"></div>
+      <div class="form-field"><label>執照別</label>${sel('flic',['','護理師','護士'],d?.licType)}</div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>學歷</label>${sel('fedu',['','研究所','大學','專科'],d?.edu)}</div>
+      <div class="form-field"><label>畢業學校</label><input type="text" id="fschool" value="${d?.school||''}"></div>
+    </div>
+    <div class="form-section">急救證照</div>
+    <div class="form-grid">
+      <div class="form-field"><label>BLS 到期日</label><input type="date" id="fbls" value="${d?.bls||''}"></div>
+      <div class="form-field"><label>ACLS 到期日</label><input type="date" id="facls" value="${d?.acls||''}"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>ALS 到期日</label><input type="date" id="fals" value="${d?.als||''}"></div>
+      <div class="form-field" style="display:flex;align-items:center;padding-top:22px"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="finservice" ${d?.inService?' checked':''}> 在職進修中</label></div>
+    </div>
+    <div class="form-section">壓力鍋技術士</div>
+    <div class="form-grid">
+      <div class="form-field"><label>第一種壓力容器證書號</label><input type="text" id="fpresF" value="${d?.presFirst||''}"></div>
+      <div class="form-field"><label>第一種壓力容器發照日期</label><input type="date" id="fpresFD" value="${d?.presFirstDate||''}"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>小型鍋爐證書號</label><input type="text" id="fpresS" value="${d?.presSmall||''}"></div>
+      <div class="form-field"><label>小型鍋爐發照日期</label><input type="date" id="fpresSd" value="${d?.presSmallDate||''}"></div>
+    </div>
+    <div class="form-section">聯絡資料</div>
+    <div class="form-grid">
+      <div class="form-field"><label>信箱</label><input type="text" id="femail" value="${d?.email||''}"></div>
+      <div class="form-field"><label>手機</label><input type="text" id="fphone" value="${d?.phone||''}"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>緊急聯絡</label><input type="text" id="femerg" value="${d?.emergency||''}"></div>
+      <div class="form-field"><label>住所動向</label><input type="text" id="floc" value="${d?.location||''}"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>護理學會號</label><input type="text" id="fmember" value="${d?.nursing_member||''}"></div>
+      <div class="form-field"><label>身分證字號</label><input type="text" id="fidno" value="${d?.id_no||''}"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveStaff('${isEdit?d.id:''}')">💾 ${isEdit?'儲存變更':'新增人員'}</button>
+    </div>`);
+}
+
+function saveStaff(editId){
+  const g=id=>document.getElementById(id)?.value||'';
+  const o={id:g('fid'),name:g('fname'),title:g('ftitle'),level:g('flevel'),
+    joinDate:g('fjoin'),licType:g('flic'),edu:g('fedu'),school:g('fschool'),
+    bls:g('fbls')||null,acls:g('facls')||null,als:g('fals')||null,
+    email:g('femail'),phone:g('fphone'),emergency:g('femerg'),location:g('floc'),
+    nursing_member:g('fmember'),id_no:g('fidno'),
+    presFirst:g('fpresF'),presFirstDate:g('fpresFD'),
+    presSmall:g('fpresS'),presSmallDate:g('fpresSd'),
+    inService:document.getElementById('finservice')?.checked||false,resigned:false};
+  if(!o.name){toast('❌ 請填入姓名');return;}
+  if(editId){
+    const i=staff.findIndex(s=>s.id===editId);
+    if(i>=0)staff[i]={...staff[i],...o};
+    toast('✅ 人員資料已更新：'+o.name);
+  }else{
+    if(!o.id){toast('❌ 請填入員編');return;}
+    if(staff.find(s=>s.id===o.id)){toast('❌ 員編已存在');return;}
+    staff.push(o);toast('✅ 已新增：'+o.name);
+  }
+  closeModal();render();fbSaveStaff();
+}
+  const s=staff.find(x=>x.id===id);if(!s)return;
+  showModal(`<div class="modal-title">📤 確認離職</div>
+    <p style="margin-bottom:16px">確認將 <strong>${s.name}</strong>（${s.title}）標記為離職？</p>
+    <div class="form-field"><label>離職日期</label><input type="date" id="rdate" value="${TODAY.toISOString().slice(0,10)}" style="width:100%"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" onclick="confirmResign('${id}')">確認離職</button>
+    </div>`);
+}
+function confirmResign(id){
+  const s=staff.find(x=>x.id===id);
+  const resDate=document.getElementById('rdate')?.value||TODAY.toISOString().slice(0,10);
+  if(!s)return;s.resigned=true;
+  resignations.push({id:s.id,name:s.name,title:s.title,resDate});
+  toast('已標記 '+s.name+' 離職');closeModal();render();fbSaveStaff();fbSaveResign();
+}
+
+function openEditContact(id){
+  const s=staff.find(x=>x.id===id);
+  if(!s)return;
+  showModal(`<div class="modal-title">✏️ 編輯通訊資料 — ${s.name}</div>
+    <div class="form-section">個人識別</div>
+    <div class="form-grid">
+      <div class="form-field"><label>身分證字號</label><input type="text" id="cid_no" value="${s.id_no||''}" style="font-family:monospace"></div>
+      <div class="form-field"><label>護理學會會員號</label><input type="text" id="cmember" value="${s.nursing_member||''}"></div>
+    </div>
+    <div class="form-section">聯絡方式</div>
+    <div class="form-grid">
+      <div class="form-field"><label>手機</label><input type="text" id="cphone" value="${s.phone||''}"></div>
+      <div class="form-field"><label>家用電話</label><input type="text" id="chome" value="${s.homePhone||''}"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>緊急聯絡人 / 電話</label><input type="text" id="cemerg" value="${s.emergency||''}"></div>
+      <div class="form-field"><label>信箱</label><input type="text" id="cemail" value="${s.email||''}"></div>
+    </div>
+    <div class="form-section">住所資訊</div>
+    <div class="form-field" style="margin-bottom:10px"><label>住所動向</label><input type="text" id="cloc" value="${s.location||''}" style="width:100%"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveContact('${s.id}')">💾 儲存通訊資料</button>
+    </div>`);
+}
+function saveContact(id){
+  const s=staff.find(x=>x.id===id);if(!s)return;
+  s.id_no=document.getElementById('cid_no')?.value||s.id_no;
+  s.nursing_member=document.getElementById('cmember')?.value||s.nursing_member;
+  s.phone=document.getElementById('cphone')?.value;
+  s.homePhone=document.getElementById('chome')?.value;
+  s.emergency=document.getElementById('cemerg')?.value;
+  s.email=document.getElementById('cemail')?.value;
+  s.location=document.getElementById('cloc')?.value;
+  toast('✅ 已更新 '+s.name+' 的通訊資料');closeModal();render();fbSaveStaff();
+}
+
+function openEditResign(idx){
+  const r=resignations[idx];if(!r)return;
+  showModal(`<div class="modal-title">✏️ 編輯離職記錄 — ${r.name}</div>
+    <div class="form-grid">
+      <div class="form-field"><label>員編</label><input type="text" id="eid" value="${r.id||''}" style="width:100%"></div>
+      <div class="form-field"><label>姓名 *</label><input type="text" id="ename" value="${r.name||''}" style="width:100%"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>職稱</label>
+        <select id="etitle" style="width:100%">
+          ${TITLE_ORDER.map(t=>`<option${t===r.title?' selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-field"><label>離職日期 *</label><input type="date" id="eresdate" value="${r.resDate||''}" style="width:100%"></div>
+    </div>
+    <div class="form-field" style="margin-bottom:10px"><label>備註</label><input type="text" id="enote" value="${r.note||''}" placeholder="例如：個人因素、升學、轉職..." style="width:100%"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveResignEdit(${idx})">💾 儲存</button>
+    </div>`);
+}
+function saveResignEdit(idx){
+  const name=document.getElementById('ename')?.value;
+  const resDate=document.getElementById('eresdate')?.value;
+  if(!name||!resDate){toast('❌ 請填入姓名與離職日期');return;}
+  resignations[idx]={
+    id:document.getElementById('eid')?.value||resignations[idx].id,
+    name,
+    title:document.getElementById('etitle')?.value,
+    resDate,
+    note:document.getElementById('enote')?.value||''
+  };
+  toast('✅ 離職記錄已更新');closeModal();destroyCharts();render();fbSaveResign();
+}
+function deleteResign(idx){
+  const r=resignations[idx];if(!r)return;
+  showModal(`<div class="modal-title">🗑 確認刪除</div>
+    <p style="margin-bottom:16px;line-height:1.7">確定要刪除 <strong>${r.name}</strong>（${r.title}，${fd(r.resDate)}）的離職記錄嗎？<br><span style="color:#c62828;font-size:12px">此操作無法復原。</span></p>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-danger" onclick="confirmDeleteResign(${idx})">確認刪除</button>
+    </div>`);
+}
+function confirmDeleteResign(idx){
+  const name=resignations[idx]?.name||'';
+  resignations.splice(idx,1);
+  toast('🗑 已刪除 '+name+' 的離職記錄');closeModal();destroyCharts();render();fbSaveResign();
+}
+
+function openAddResign(){
+  showModal(`<div class="modal-title">➕ 新增離職記錄</div>
+    <div class="form-grid">
+      <div class="form-field"><label>員編</label><input type="text" id="rid" style="width:100%"></div>
+      <div class="form-field"><label>姓名 *</label><input type="text" id="rname" style="width:100%"></div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field"><label>職稱</label><select id="rtitle" style="width:100%">${TITLE_ORDER.map(t=>`<option>${t}</option>`).join('')}</select></div>
+      <div class="form-field"><label>離職日期 *</label><input type="date" id="rdate2" style="width:100%"></div>
+    </div>
+    <div class="form-field" style="margin-bottom:10px"><label>備註</label><input type="text" id="rnote" placeholder="例如：個人因素、升學、轉職..." style="width:100%"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">取消</button>
+      <button class="btn btn-primary" onclick="saveResign()">儲存</button>
+    </div>`);
+}
+function saveResign(){
+  const id=document.getElementById('rid')?.value||'—';
+  const name=document.getElementById('rname')?.value;
+  const title=document.getElementById('rtitle')?.value;
+  const resDate=document.getElementById('rdate2')?.value;
+  const note=document.getElementById('rnote')?.value||'';
+  if(!name||!resDate){toast('❌ 請填入姓名與離職日期');return;}
+  resignations.push({id,name,title,resDate,note});
+  toast('✅ 離職記錄已新增');closeModal();destroyCharts();render();fbSaveResign();
+}
+function checkContactPin(){
+  if(document.getElementById('cpinput')?.value===CONTACT_PIN){contactUnlocked=true;render();}
+  else{const e=document.getElementById('cpinerr');if(e)e.textContent='密碼錯誤，請重試';}
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORTS
+// ═══════════════════════════════════════════════════════════
+function toggleInService(id){
+  const s=staff.find(x=>x.id===id);
+  if(!s)return;
+  s.inService=!s.inService;
+  toast(s.inService?'✅ '+s.name+' 設為在職進修中':'已取消 '+s.name+' 在職進修');
+  render();fbSaveStaff();
+}
+
+function exportCSV(type){
+  const BOM='\uFEFF';
+  let headers,rows;
+  if(type==='staff'){
+    headers=['員編','姓名','職稱','等級','到職日','年資','特休(天)','執照別','學歷','在職進修','BLS到期','ACLS到期','ALS到期','壓力鍋(第一種)','小型鍋爐'];
+    rows=active().map(s=>[s.id,s.name,s.title,s.level,s.joinDate,calcSen(s.joinDate).text,calcLeave(s.joinDate),s.licType,s.edu,s.inService?'是':'否',s.bls||'',s.acls||'',s.als||'',s.presFirst||'',s.presSmall||'']);
+  }else if(type==='contact'){
+    headers=['員編','姓名','職稱','身分證','護理學會號','信箱','手機','緊急聯絡','住所動向'];
+    rows=active().map(s=>[s.id,s.name,s.title,s.id_no||'',s.nursing_member||'',s.email||'',s.phone||'',s.emergency||'',s.location||'']);
+  }else if(type==='cert'){
+    headers=['員編','姓名','職稱','證照','到期日','狀態','剩餘天數'];
+    rows=[];
+    active().forEach(s=>[{key:'bls',lbl:'BLS'},{key:'acls',lbl:'ACLS'},{key:'als',lbl:'ALS'}].forEach(cd=>{
+      const st=certSt(s[cd.key]);
+      rows.push([s.id,s.name,s.title,cd.lbl,s[cd.key]||'',st.lbl,st.days??'']);
+    }));
+  }else{
+    headers=['員編','姓名','職稱','離職日期','備註'];
+    rows=resignations.map(r=>[r.id,r.name,r.title,r.resDate,r.note||'']);
+  }
+  const fnames={'staff':'手術室護理人員明細','contact':'人員通訊錄','cert':'急救證照狀態','resign':'離職記錄'};
+  const content=BOM+[headers,...rows].map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob=new Blob([content],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=fnames[type]+'.csv';a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('✅ 已匯出：'+fnames[type]+'.csv');
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════
+function toast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.style.opacity=1;
+  clearTimeout(t._tid);t._tid=setTimeout(()=>t.style.opacity=0,2600);
+}
+
+// ═══════════════════════════════════════════════════════════
+// FIREBASE REST API 同步（無需 SDK，直接 fetch）
+// ═══════════════════════════════════════════════════════════
+const FB = 'https://or-nursing-72cc9-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+async function fbGet(path){
+  const r = await fetch(`${FB}/${path}.json`);
+  if(!r.ok) throw new Error(r.status);
+  return r.json();
+}
+async function fbPut(path, data){
+  const r = await fetch(`${FB}/${path}.json`,{
+    method:'PUT', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(data)
+  });
+  if(!r.ok) throw new Error(r.status);
+}
+
+function setSyncStatus(s){
+  const el = document.getElementById('sync-indicator');
+  if(!el) return;
+  const m = {
+    loading:{t:'⏳ 同步中…', c:'#e65100'},
+    ok:     {t:'☁️ 已同步',  c:'#2e7d32'},
+    error:  {t:'⚠️ 離線',    c:'#c62828'},
+  }[s]||{t:'',c:''};
+  el.textContent = m.t; el.style.color = m.c;
+}
+
+async function loadFromFirebase(){
+  setSyncStatus('loading');
+  try{
+    const [sv, rv] = await Promise.all([fbGet('staff'), fbGet('resignations')]);
+    if(sv && typeof sv==='object'){
+      const arr = Array.isArray(sv) ? sv : Object.values(sv);
+      const clean = arr.filter(Boolean);
+      if(clean.length){
+        staff = clean.map(s=>({
+          ...s,
+          inService: s.inService===true||s.inService==='true',
+          resigned:  s.resigned===true||s.resigned==='true',
+          bls:s.bls||null, acls:s.acls||null, als:s.als||null,
+        }));
+      }
+    }
+    if(rv && typeof rv==='object'){
+      const arr = Array.isArray(rv) ? rv : Object.values(rv);
+      const clean = arr.filter(Boolean);
+      if(clean.length) resignations = clean;
+    }
+    setSyncStatus('ok');
+    destroyCharts(); render();
+  }catch(e){
+    setSyncStatus('error');
+    render();
+  }
+}
+
+async function fbSaveStaff(){
+  setSyncStatus('loading');
+  try{
+    const obj={};
+    staff.forEach(s=>{ obj[s.id]=s; });
+    await fbPut('staff', obj);
+    setSyncStatus('ok');
+  }catch(e){ setSyncStatus('error'); }
+}
+
+async function fbSaveResign(){
+  try{
+    const obj={};
+    resignations.forEach((r,i)=>{ obj['r'+i]=r; });
+    await fbPut('resignations', obj);
+  }catch(e){ setSyncStatus('error'); }
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+document.getElementById('topbar-date').textContent=TODAY.toLocaleDateString('zh-TW',{year:'numeric',month:'long',day:'numeric'});
+loadFromFirebase();
+</script>
+</body>
+</html>
