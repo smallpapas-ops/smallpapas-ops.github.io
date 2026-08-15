@@ -865,12 +865,14 @@ function checkNormalConflict(startStr,endStr,wd){
     }
   }
 
-  // 超過個人特休1/2（長假才擋）
+  // 超過個人特休1/2（長假才擋，以申請年度計算已用天數）
   const total=getMemberLeave(m.id);
+  const applyYear=start.getFullYear();
+  const usedThisYear=usedLeave(m.id, applyYear);
   const halfQuota=Math.floor(total/2);
-  if(wd>=5 && wd>halfQuota){
+  if(wd>=5 && (usedThisYear + wd) > halfQuota){
     blocked=true;
-    html+=`<div class="alert alert-err">⛔ 長假天數超過個人特休1/2（上限 ${halfQuota} 天），無法送出</div>`;
+    html+=`<div class="alert alert-err">⛔ ${applyYear}年長假累計超過特休1/2（上限 ${halfQuota} 天，已用 ${usedThisYear} 天），無法送出</div>`;
   }
 
   // 本組已有長假名額（長假才擋）
@@ -947,8 +949,10 @@ function submitNormal(){
   const wd=countWorkdays(start,end);
   const total=getMemberLeave(m.id);
   if(wd>total){alert(`申請天數(${wd})超過特休總額(${total})`);return;}
+  const applyYear=start.getFullYear();
+  const usedThisYear=usedLeave(m.id, applyYear);
   const halfQuota=Math.floor(total/2);
-  if(wd>=5&&wd>halfQuota){alert(`⛔ 長假天數超過個人特休1/2（上限 ${halfQuota} 天）`);return;}
+  if(wd>=5&&(usedThisYear+wd)>halfQuota){alert(`⛔ ${applyYear}年長假累計超過特休1/2（上限 ${halfQuota} 天，已用 ${usedThisYear} 天）`);return;}
 
   // 同組重疊工作日檢查（不論天數）
   const sameGroup=state.members.filter(x=>x.group===m.group && x.id!==m.id);
@@ -1344,6 +1348,8 @@ function renderSettingsPanel(){
       </button>
     </div>`;
 }
+
+function renderAdminPanel(){
   document.getElementById('app').style.display='none';
   document.getElementById('adminPanel').style.display='block';
   renderAdminKpiCards();
