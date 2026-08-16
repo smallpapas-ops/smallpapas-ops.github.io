@@ -390,6 +390,7 @@ tr:last-child td{border-bottom:none;}
     <div class="tab-bar" id="adminTabBar">
       <div class="tab-item active" data-tab="a-overview" onclick="switchAdminTab('a-overview',this)">📊 總覽</div>
       <div class="tab-item" data-tab="a-pending" onclick="switchAdminTab('a-pending',this)">⏳ 待審核</div>
+      <div class="tab-item" data-tab="a-direct" onclick="switchAdminTab('a-direct',this)">✏️ 直接預約</div>
       <div class="tab-item" data-tab="a-members" onclick="switchAdminTab('a-members',this)">👥 組員管理</div>
       <div class="tab-item" data-tab="a-kpi" onclick="switchAdminTab('a-kpi',this)">📈 KPI</div>
       <div class="tab-item" data-tab="a-export" onclick="switchAdminTab('a-export',this)">📤 匯出</div>
@@ -415,6 +416,34 @@ tr:last-child td{border-bottom:none;}
       <div class="card">
         <div class="card-title">⏳ 待主管核准</div>
         <div id="adminPendingList"></div>
+      </div>
+    </div>
+
+    <div class="panel" id="atab-a-direct">
+      <div class="card">
+        <div class="card-title">✏️ 主管直接預約</div>
+        <div class="alert alert-info" style="margin-bottom:12px;">此功能不受衝突、天數、1/2上限等任何限制，直接以「已完成」狀態建立預約。</div>
+        <div class="form-row">
+          <label>選擇員工</label>
+          <select id="directMember" onchange="updateDirectLeaveInfo()">
+            <option value="">-- 請選擇 --</option>
+          </select>
+        </div>
+        <div id="directLeaveInfo" style="margin-bottom:10px;"></div>
+        <div class="form-row">
+          <label>假期類型</label>
+          <select id="directType">
+            <option value="normal">一般特休</option>
+            <option value="swap">對調</option>
+          </select>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>開始日期</label><input type="date" id="directStart" onchange="calcDirectDays()"></div>
+          <div class="form-row"><label>結束日期</label><input type="date" id="directEnd" onchange="calcDirectDays()"></div>
+        </div>
+        <div id="directDayCount" class="text-sm" style="margin-bottom:10px;"></div>
+        <div class="form-row"><label>備註</label><input type="text" id="directNote" placeholder="選填"></div>
+        <button class="btn btn-primary btn-full mt-12" onclick="submitDirect()">✅ 直接建立（已完成）</button>
       </div>
     </div>
 
@@ -1359,6 +1388,73 @@ function renderAdminPanel(){
   renderAdminMembers();
   renderKPI();
   renderSettingsPanel();
+  initDirectMemberSelect();
+}
+
+// ── 主管直接預約 ──
+function initDirectMemberSelect(){
+  const sel = document.getElementById('directMember');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">-- 請選擇 --</option>' +
+    state.members.map(m=>`<option value="${m.id}">${m.name}（${m.group}組 #${m.id}）</option>`).join('');
+}
+
+function updateDirectLeaveInfo(){
+  const id = document.getElementById('directMember').value;
+  const el = document.getElementById('directLeaveInfo');
+  if(!id){ el.innerHTML=''; return; }
+  const m = getMember(id);
+  const total = getMemberLeave(id);
+  const used = usedLeave(id, new Date().getFullYear());
+  el.innerHTML=`<div style="background:var(--accent-light);border-radius:var(--radius-sm);padding:10px;font-size:13px;">
+    <b>${m.name}</b>（${m.group}組）｜總特休：${total}天｜已用：${used}天｜剩餘：${total-used}天
+  </div>`;
+}
+
+function calcDirectDays(){
+  const s=document.getElementById('directStart').value;
+  const e=document.getElementById('directEnd').value;
+  const el=document.getElementById('directDayCount');
+  if(!s||!e){el.innerHTML='';return;}
+  if(parseDate(e)<parseDate(s)){el.innerHTML='<span style="color:var(--red)">結束日期不可早於開始日期</span>';return;}
+  const wd=countWorkdays(parseDate(s),parseDate(e));
+  el.innerHTML=`計算工作天數：<b>${wd}</b>天`;
+}
+
+function submitDirect(){
+  const memberId = document.getElementById('directMember').value;
+  if(!memberId){alert('請選擇員工');return;}
+  const m = getMember(memberId);
+  const s = document.getElementById('directStart').value;
+  const e = document.getElementById('directEnd').value;
+  if(!s||!e){alert('請填寫日期');return;}
+  const start=parseDate(s), end=parseDate(e);
+  if(end<start){alert('結束日期不可早於開始日期');return;}
+  const wd = countWorkdays(start, end);
+  const type = document.getElementById('directType').value;
+  const note = document.getElementById('directNote').value;
+  if(!confirm(`確定為 ${m.name} 直接建立預約？\n${s} ~ ${e}（${wd}工作天）\n狀態：已完成`)) return;
+  const app={
+    id:'APP'+Date.now(),
+    applicantId:m.id, applicantName:m.name, group:m.group,
+    type, startDate:s, endDate:e, workdays:wd,
+    status:'done',
+    appliedAt:new Date().toISOString(),
+    note: note || '主管直接建立',
+    history:[{at:new Date().toISOString(), note:'主管直接建立預約'}]
+  };
+  state.applications.push(app);
+  saveState();
+  renderAdminKpiCards();
+  renderConflictAlert();
+  renderAdminRecords(adminRecordFilter2);
+  renderCalendar();
+  updateDirectLeaveInfo();
+  document.getElementById('directStart').value='';
+  document.getElementById('directEnd').value='';
+  document.getElementById('directDayCount').innerHTML='';
+  document.getElementById('directNote').value='';
+  alert(`✅ 已為 ${m.name} 建立預約（${s} ~ ${e}，${wd}工作天）`);
 }
 
 // ── 衝突偵測：掃描所有同組重疊申請 ──
