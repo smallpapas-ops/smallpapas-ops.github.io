@@ -101,15 +101,15 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);}
 .cal-nav{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;}
 .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
 .cal-dow{text-align:center;font-size:11px;font-weight:600;color:var(--text3);padding:4px 0;}
-.cal-day{min-height:70px;background:var(--surface2);border-radius:6px;padding:4px;font-size:12px;position:relative;}
-.cal-day.today{background:var(--accent-light);border:1px solid var(--accent);}
-.cal-day.other-month{opacity:.4;}
-.cal-day .day-num{font-weight:600;color:var(--text2);}
+.cal-day{min-height:90px;background:var(--surface2);border-radius:6px;padding:5px;font-size:13px;position:relative;}
+.cal-day.today{background:var(--accent-light);border:2px solid var(--accent);}
+.cal-day.other-month{opacity:.3;}
+.cal-day .day-num{font-weight:700;color:var(--text);font-size:14px;}
 .cal-day.weekend .day-num{color:var(--red);}
-.cal-events{margin-top:2px;display:flex;flex-direction:column;gap:1px;}
-.cal-event{font-size:10px;padding:1px 4px;border-radius:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.cal-event.a-ev{background:rgba(59,111,212,.15);color:var(--a-color);}
-.cal-event.b-ev{background:rgba(56,161,105,.15);color:var(--b-color);}
+.cal-events{margin-top:3px;display:flex;flex-direction:column;gap:2px;}
+.cal-event{font-size:12px;font-weight:600;padding:2px 6px;border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cal-event.a-ev{background:rgba(59,111,212,.22);color:#1e4db7;}
+.cal-event.b-ev{background:rgba(56,161,105,.22);color:#1a6b41;}
 /* ─── MODAL ─── */
 .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:none;align-items:flex-end;justify-content:center;}
 .overlay.active{display:flex;}
@@ -1268,10 +1268,10 @@ function renderCalendar(){
       const as=parseDate(a.startDate),ae=parseDate(a.endDate);
       return d>=as&&d<=ae;
     });
-    const evHtml=appsThisDay.slice(0,3).map(a=>`<div class="cal-event ${a.group==='A'?'a-ev':'b-ev'}">${a.applicantName}</div>`).join('');
+    const evHtml=appsThisDay.slice(0,5).map(a=>`<div class="cal-event ${a.group==='A'?'a-ev':'b-ev'}">${a.applicantName}</div>`).join('');
     html+=`<div class="cal-day ${isToday?'today':''} ${isWknd?'weekend':''}">
       <div class="day-num">${day}</div>
-      <div class="cal-events">${evHtml}${appsThisDay.length>3?`<div class="text-sm">+${appsThisDay.length-3}</div>`:''}</div>
+      <div class="cal-events">${evHtml}${appsThisDay.length>5?`<div style="font-size:11px;color:var(--text3);">+${appsThisDay.length-5}人</div>`:''}</div>
     </div>`;
   }
   document.getElementById('calGrid').innerHTML=html;
