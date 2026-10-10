@@ -1658,8 +1658,30 @@ function openEditMember(id){
       <select id="emGroup"><option value="A" ${m.group==='A'?'selected':''}>A組</option><option value="B" ${m.group==='B'?'selected':''}>B組</option></select>
     </div>
     <div class="form-row"><label>自訂特休（留空=自動）</label><input type="number" id="emLeave" value="${m.customLeave!=null?m.customLeave:''}"></div>
-    <button class="btn btn-primary btn-full mt-12" onclick="saveEditMember('${id}')">儲存</button>`;
+    <button class="btn btn-primary btn-full mt-12" onclick="saveEditMember('${id}')">儲存</button>
+    <button class="btn btn-full mt-12" style="background:#e53e3e;color:#fff;border:none;padding:10px;border-radius:8px;cursor:pointer;font-size:15px;" onclick="deleteMember('${id}')">🗑 刪除人員（離職）</button>`;
   document.getElementById('editMemberOverlay').classList.add('active');
+}
+function deleteMember(id){
+  const m=getMember(id); if(!m) return;
+  const appCount=state.applications.filter(a=>a.applicantId===id&&['done','pending'].includes(a.status)).length;
+  const msg=appCount>0
+    ?`確定要刪除「${m.name}」嗎？\n此人尚有 ${appCount} 筆有效預約，刪除後將一併作廢。`
+    :`確定要刪除「${m.name}」嗎？`;
+  if(!confirm(msg)) return;
+  // Mark their active applications as rejected
+  state.applications.forEach(a=>{
+    if(a.applicantId===id&&['done','pending','swap_pending'].includes(a.status)){
+      a.status='rejected';
+      a.history.push({at:new Date().toISOString(),note:'人員離職，預約作廢'});
+    }
+  });
+  // Remove member
+  state.members=state.members.filter(x=>x.id!==id);
+  saveState();
+  closeOverlay('editMemberOverlay');
+  renderAdminMembers(); renderGroups(); renderCalendar();
+  alert(`已刪除 ${m.name}`);
 }
 function saveEditMember(id){
   const m=getMember(id); if(!m) return;
